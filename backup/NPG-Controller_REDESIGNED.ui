@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry"><rect><x>0</x><y>0</y><width>1183</width><height>738</height></rect></property>
+  <property name="windowTitle"><string>NPG Gamepad Emulator</string></property>
+  <property name="styleSheet"><string notr="true">/* BLACK &amp; WHITE GAMING THEME - CORRECTED */
+
+QMainWindow, QWidget {
+    background-color: #0a0a0a;
+    font-family: &quot;Segoe UI&quot;, Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: #e8e8e8;
+}
+
+QScrollBar:vertical {
+    background: #141414;
+    width: 8px;
+    border-radius: 4px;
+}
+
+QScrollBar::handle:vertical {
+    background: #ffffff;
+    border-radius: 4px;
+}
+
+QGroupBox {
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 15px;
+    margin-top: 16px;
+    padding: 14px 12px;
+    background-color: #141414;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 16px;
+    top: 0px;
+    padding: 6px 10px;
+    background-color: #ffffff;
+    border-radius: 7px;
+    color: #0C0C0C;
+    font-size: 15px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+QCheckBox {
+    color: #e8e8e8;
+    spacing: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 4px 0px;
+    background-color: transparent;
+}
+
+QCheckBox:hover {
+    color: #ffffff;
+}
+
+QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    background-color: transparent;
+    border: 2px solid #3a3a3a;
+}
+
+QCheckBox::indicator:hover {
+    border: 2px solid #ffffff;
+}
+
+QCheckBox::indicator:checked {
+    background-color: transparent;
+    border: 2px solid #ffffff;
+    image: url(icons/check.svg);
+}
+
+QFrame[frameShape=&quot;4&quot;], QFrame[frameShape=&quot;5&quot;] {
+    color: #2a2a2a;
+    background-color: #2a2a2a;
+}
+
+QFrame[frameShape=&quot;4&quot;] {
+    max-height: 1px;
+    margin: 6px 0px;
+}
+
+QFrame[frameShape=&quot;5&quot;] {
+    max-width: 1px;
+    margin: 0px 8px;
+}
+
+QLabel {
+    color: #e8e8e8;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+QProgressBar {
+    background-color: #141414;
+    border: 1px solid #2a2a2a;
+    border-radius: 6px;
+    text-align: center;
+    color: transparent;
+    min-height: 26px;
+    max-height: 26px;
+}
+
+QProgressBar::chunk {
+    background-color: #ffffff;
+    border-radius: 5px;
+    margin: 1px;
+}
+
+QPushButton {
+    background-color: #141414;
+    border: 1px solid #3a3a3a;
+    border-radius: 6px;
+    color: #e8e8e8;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    min-width: 46px;
+}
+
+QPushButton:checked {
+    background-color: #1a1a1a;
+    border: 1px solid #ffffff;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+QPushButton:hover {
+    background-color: #1a1a1a;
+    border: 1px solid #ffffff;
+    color: #ffffff;
+}
+
+QLabel#lblFocus, QLabel#lblBlink, QLabel#lblJaw,
+QLabel#lblEMG1, QLabel#lblEMG2, QLabel#lblEMG3, QLabel#lblEMG4, QLabel#lblECG {
+    background-color: transparent;
+}
+
+QPushButton:pressed {
+    background-color: #0a0a0a;
+}
+
+/* ── Disabled state ─────────────────────────────────────── */
+
+QPushButton:disabled {
+    background-color: #0d0d0d;
+    border: 1px solid #1e1e1e;
+    color: #333333;
+}
+
+QCheckBox:disabled {
+    color: #333333;
+}
+
+QCheckBox::indicator:disabled {
+    border: 2px solid #222222;
+    background-color: transparent;
+}
+
+QLabel:disabled {
+    color: #333333;
+}</string></property>
+
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="mainVLayout">
+    <property name="spacing"><number>12</number></property><property name="leftMargin"><number>12</number></property><property name="topMargin"><number>12</number></property><property name="rightMargin"><number>12</number></property><property name="bottomMargin"><number>12</number></property>
+
+    <item>
+     <layout class="QHBoxLayout" name="contentHLayout">
+      <property name="spacing"><number>12</number></property>
+
+      <!-- ═══ SIGNAL CONFIGURATION ═══ -->
+      <item>
+       <widget class="QGroupBox" name="configGroup">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+          <horstretch>0</horstretch><verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize"><size><width>420</width><height>0</height></size></property>
+        <property name="title"><string>SIGNAL CONFIGURATION</string></property>
+        <layout class="QVBoxLayout" name="configVLayout">
+         <property name="spacing"><number>8</number></property><property name="leftMargin"><number>12</number></property><property name="topMargin"><number>20</number></property><property name="rightMargin"><number>12</number></property><property name="bottomMargin"><number>12</number></property>
+
+         <item><layout class="QHBoxLayout" name="selRowConfig"><property name="spacing"><number>0</number></property><item><widget class="QPushButton" name="btnSel_Config_All"><property name="styleSheet"><string notr="true">QPushButton{border-right:none;border-top-left-radius:6px;border-bottom-left-radius:6px;border-top-right-radius:0;border-bottom-right-radius:0;min-width:36px;font-size:11px;}QPushButton:checked{background-color:#ffffff;color:#000000;border:1px solid #ffffff;}</string></property><property name="text"><string>All</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnSel_Config_Ch1"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-right:none;border-radius:0;min-width:36px;font-size:11px;}QPushButton:checked{background-color:#ffffff;color:#000000;border:1px solid #ffffff;}</string></property><property name="text"><string>Ch1</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnSel_Config_Ch2"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-right:none;border-radius:0;min-width:36px;font-size:11px;}QPushButton:checked{background-color:#ffffff;color:#000000;border:1px solid #ffffff;}</string></property><property name="text"><string>Ch2</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnSel_Config_Ch3"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-right:none;border-radius:0;min-width:36px;font-size:11px;}QPushButton:checked{background-color:#ffffff;color:#000000;border:1px solid #ffffff;}</string></property><property name="text"><string>Ch3</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnSel_Config_Ch4"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-right:none;border-radius:0;min-width:36px;font-size:11px;}QPushButton:checked{background-color:#ffffff;color:#000000;border:1px solid #ffffff;}</string></property><property name="text"><string>Ch4</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnSel_Config_Ch5"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-right:none;border-radius:0;min-width:36px;font-size:11px;}QPushButton:checked{background-color:#ffffff;color:#000000;border:1px solid #ffffff;}</string></property><property name="text"><string>Ch5</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnSel_Config_Ch6"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-top-left-radius:0;border-bottom-left-radius:0;border-top-right-radius:6px;border-bottom-right-radius:6px;min-width:36px;font-size:11px;}QPushButton:checked{background-color:#ffffff;color:#000000;border:1px solid #ffffff;}</string></property><property name="text"><string>Ch6</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><spacer name="spacerSelConfig"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint"><size><width>20</width><height>20</height></size></property></spacer></item></layout></item>
+         <item><widget class="QGroupBox" name="grpCh1"><property name="styleSheet"><string notr="true">QGroupBox#grpCh1{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:14px;padding:6px 8px;}QGroupBox#grpCh1::title{font-size:11px;padding:3px 8px;}</string></property><property name="title"><string>Channel 1</string></property><layout class="QHBoxLayout" name="chLayout1"><property name="spacing"><number>8</number></property><property name="leftMargin"><number>8</number></property><property name="topMargin"><number>10</number></property><property name="rightMargin"><number>8</number></property><property name="bottomMargin"><number>8</number></property><item><widget class="QCheckBox" name="chkCh1"><property name="text"><string></string></property><property name="checked"><bool>true</bool></property></widget></item><item><layout class="QHBoxLayout" name="filterLayout1"><property name="spacing"><number>0</number></property><item><widget class="QPushButton" name="btnFilterCh1EMG"><property name="styleSheet"><string notr="true">QPushButton{border-right:none;border-top-left-radius:6px;border-bottom-left-radius:6px;border-top-right-radius:0;border-bottom-right-radius:0;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>EMG</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnFilterCh1EEG"><property name="styleSheet"><string notr="true">QPushButton{border-radius:0;border-left:none;border-right:none;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>EEG</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnFilterCh1EOG"><property name="styleSheet"><string notr="true">QPushButton{border-radius:0;border-left:none;border-right:none;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>EOG</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnFilterCh1ECG"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-top-left-radius:0;border-bottom-left-radius:0;border-top-right-radius:6px;border-bottom-right-radius:6px;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>ECG</string></property><property name="checkable"><bool>true</bool></property></widget></item></layout></item><item><widget class="QPushButton" name="btnChIcon1"><property name="styleSheet"><string notr="true">QPushButton{background-color:transparent;border:none;min-width:26px;max-width:26px;min-height:26px;max-height:26px;padding:0px;qproperty-icon:url(icons/gamepad.svg);qproperty-iconSize:18px 18px;}QPushButton:hover{background-color:#1a1a1a;border-radius:4px;}</string></property><property name="text"><string></string></property><property name="toolTip"><string>Select Ch1 in Signal Inputs</string></property></widget></item></layout></widget></item><item><widget class="QGroupBox" name="grpCh2"><property name="styleSheet"><string notr="true">QGroupBox#grpCh2{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:14px;padding:6px 8px;}QGroupBox#grpCh2::title{font-size:11px;padding:3px 8px;}</string></property><property name="title"><string>Channel 2</string></property><layout class="QHBoxLayout" name="chLayout2"><property name="spacing"><number>8</number></property><property name="leftMargin"><number>8</number></property><property name="topMargin"><number>10</number></property><property name="rightMargin"><number>8</number></property><property name="bottomMargin"><number>8</number></property><item><widget class="QCheckBox" name="chkCh2"><property name="text"><string></string></property><property name="checked"><bool>true</bool></property></widget></item><item><layout class="QHBoxLayout" name="filterLayout2"><property name="spacing"><number>0</number></property><item><widget class="QPushButton" name="btnFilterCh2EMG"><property name="styleSheet"><string notr="true">QPushButton{border-right:none;border-top-left-radius:6px;border-bottom-left-radius:6px;border-top-right-radius:0;border-bottom-right-radius:0;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>EMG</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnFilterCh2EEG"><property name="styleSheet"><string notr="true">QPushButton{border-radius:0;border-left:none;border-right:none;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>EEG</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnFilterCh2EOG"><property name="styleSheet"><string notr="true">QPushButton{border-radius:0;border-left:none;border-right:none;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>EOG</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnFilterCh2ECG"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-top-left-radius:0;border-bottom-left-radius:0;border-top-right-radius:6px;border-bottom-right-radius:6px;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>ECG</string></property><property name="checkable"><bool>true</bool></property></widget></item></layout></item><item><widget class="QPushButton" name="btnChIcon2"><property name="styleSheet"><string notr="true">QPushButton{background-color:transparent;border:none;min-width:26px;max-width:26px;min-height:26px;max-height:26px;padding:0px;qproperty-icon:url(icons/gamepad.svg);qproperty-iconSize:18px 18px;}QPushButton:hover{background-color:#1a1a1a;border-radius:4px;}</string></property><property name="text"><string></string></property><property name="toolTip"><string>Select Ch2 in Signal Inputs</string></property></widget></item></layout></widget></item><item><widget class="QGroupBox" name="grpCh3"><property name="styleSheet"><string notr="true">QGroupBox#grpCh3{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:14px;padding:6px 8px;}QGroupBox#grpCh3::title{font-size:11px;padding:3px 8px;}</string></property><property name="title"><string>Channel 3</string></property><layout class="QHBoxLayout" name="chLayout3"><property name="spacing"><number>8</number></property><property name="leftMargin"><number>8</number></property><property name="topMargin"><number>10</number></property><property name="rightMargin"><number>8</number></property><property name="bottomMargin"><number>8</number></property><item><widget class="QCheckBox" name="chkCh3"><property name="text"><string></string></property><property name="checked"><bool>true</bool></property></widget></item><item><layout class="QHBoxLayout" name="filterLayout3"><property name="spacing"><number>0</number></property><item><widget class="QPushButton" name="btnFilterCh3EMG"><property name="styleSheet"><string notr="true">QPushButton{border-right:none;border-top-left-radius:6px;border-bottom-left-radius:6px;border-top-right-radius:0;border-bottom-right-radius:0;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>EMG</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnFilterCh3EEG"><property name="styleSheet"><string notr="true">QPushButton{border-radius:0;border-left:none;border-right:none;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>EEG</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnFilterCh3EOG"><property name="styleSheet"><string notr="true">QPushButton{border-radius:0;border-left:none;border-right:none;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>EOG</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnFilterCh3ECG"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-top-left-radius:0;border-bottom-left-radius:0;border-top-right-radius:6px;border-bottom-right-radius:6px;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>ECG</string></property><property name="checkable"><bool>true</bool></property></widget></item></layout></item><item><widget class="QPushButton" name="btnChIcon3"><property name="styleSheet"><string notr="true">QPushButton{background-color:transparent;border:none;min-width:26px;max-width:26px;min-height:26px;max-height:26px;padding:0px;qproperty-icon:url(icons/gamepad.svg);qproperty-iconSize:18px 18px;}QPushButton:hover{background-color:#1a1a1a;border-radius:4px;}</string></property><property name="text"><string></string></property><property name="toolTip"><string>Select Ch3 in Signal Inputs</string></property></widget></item></layout></widget></item><item><widget class="QGroupBox" name="grpCh4"><property name="styleSheet"><string notr="true">QGroupBox#grpCh4{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:14px;padding:6px 8px;}QGroupBox#grpCh4::title{font-size:11px;padding:3px 8px;}</string></property><property name="title"><string>Channel 4</string></property><layout class="QHBoxLayout" name="chLayout4"><property name="spacing"><number>8</number></property><property name="leftMargin"><number>8</number></property><property name="topMargin"><number>10</number></property><property name="rightMargin"><number>8</number></property><property name="bottomMargin"><number>8</number></property><item><widget class="QCheckBox" name="chkCh4"><property name="text"><string></string></property></widget></item><item><layout class="QHBoxLayout" name="filterLayout4"><property name="spacing"><number>0</number></property><item><widget class="QPushButton" name="btnFilterCh4EMG"><property name="styleSheet"><string notr="true">QPushButton{border-right:none;border-top-left-radius:6px;border-bottom-left-radius:6px;border-top-right-radius:0;border-bottom-right-radius:0;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>EMG</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnFilterCh4EEG"><property name="styleSheet"><string notr="true">QPushButton{border-radius:0;border-left:none;border-right:none;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>EEG</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnFilterCh4EOG"><property name="styleSheet"><string notr="true">QPushButton{border-radius:0;border-left:none;border-right:none;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>EOG</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnFilterCh4ECG"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-top-left-radius:0;border-bottom-left-radius:0;border-top-right-radius:6px;border-bottom-right-radius:6px;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>ECG</string></property><property name="checkable"><bool>true</bool></property></widget></item></layout></item><item><widget class="QPushButton" name="btnChIcon4"><property name="styleSheet"><string notr="true">QPushButton{background-color:transparent;border:none;min-width:26px;max-width:26px;min-height:26px;max-height:26px;padding:0px;qproperty-icon:url(icons/gamepad.svg);qproperty-iconSize:18px 18px;}QPushButton:hover{background-color:#1a1a1a;border-radius:4px;}</string></property><property name="text"><string></string></property><property name="toolTip"><string>Select Ch4 in Signal Inputs</string></property></widget></item></layout></widget></item><item><widget class="QGroupBox" name="grpCh5"><property name="styleSheet"><string notr="true">QGroupBox#grpCh5{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:14px;padding:6px 8px;}QGroupBox#grpCh5::title{font-size:11px;padding:3px 8px;}</string></property><property name="title"><string>Channel 5</string></property><layout class="QHBoxLayout" name="chLayout5"><property name="spacing"><number>8</number></property><property name="leftMargin"><number>8</number></property><property name="topMargin"><number>10</number></property><property name="rightMargin"><number>8</number></property><property name="bottomMargin"><number>8</number></property><item><widget class="QCheckBox" name="chkCh5"><property name="text"><string></string></property></widget></item><item><layout class="QHBoxLayout" name="filterLayout5"><property name="spacing"><number>0</number></property><item><widget class="QPushButton" name="btnFilterCh5EMG"><property name="styleSheet"><string notr="true">QPushButton{border-right:none;border-top-left-radius:6px;border-bottom-left-radius:6px;border-top-right-radius:0;border-bottom-right-radius:0;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>EMG</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnFilterCh5EEG"><property name="styleSheet"><string notr="true">QPushButton{border-radius:0;border-left:none;border-right:none;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>EEG</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnFilterCh5EOG"><property name="styleSheet"><string notr="true">QPushButton{border-radius:0;border-left:none;border-right:none;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>EOG</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnFilterCh5ECG"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-top-left-radius:0;border-bottom-left-radius:0;border-top-right-radius:6px;border-bottom-right-radius:6px;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>ECG</string></property><property name="checkable"><bool>true</bool></property></widget></item></layout></item><item><widget class="QPushButton" name="btnChIcon5"><property name="styleSheet"><string notr="true">QPushButton{background-color:transparent;border:none;min-width:26px;max-width:26px;min-height:26px;max-height:26px;padding:0px;qproperty-icon:url(icons/gamepad.svg);qproperty-iconSize:18px 18px;}QPushButton:hover{background-color:#1a1a1a;border-radius:4px;}</string></property><property name="text"><string></string></property><property name="toolTip"><string>Select Ch5 in Signal Inputs</string></property></widget></item></layout></widget></item><item><widget class="QGroupBox" name="grpCh6"><property name="styleSheet"><string notr="true">QGroupBox#grpCh6{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:14px;padding:6px 8px;}QGroupBox#grpCh6::title{font-size:11px;padding:3px 8px;}</string></property><property name="title"><string>Channel 6</string></property><layout class="QHBoxLayout" name="chLayout6"><property name="spacing"><number>8</number></property><property name="leftMargin"><number>8</number></property><property name="topMargin"><number>10</number></property><property name="rightMargin"><number>8</number></property><property name="bottomMargin"><number>8</number></property><item><widget class="QCheckBox" name="chkCh6"><property name="text"><string></string></property></widget></item><item><layout class="QHBoxLayout" name="filterLayout6"><property name="spacing"><number>0</number></property><item><widget class="QPushButton" name="btnFilterCh6EMG"><property name="styleSheet"><string notr="true">QPushButton{border-right:none;border-top-left-radius:6px;border-bottom-left-radius:6px;border-top-right-radius:0;border-bottom-right-radius:0;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>EMG</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnFilterCh6EEG"><property name="styleSheet"><string notr="true">QPushButton{border-radius:0;border-left:none;border-right:none;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>EEG</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnFilterCh6EOG"><property name="styleSheet"><string notr="true">QPushButton{border-radius:0;border-left:none;border-right:none;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>EOG</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnFilterCh6ECG"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-top-left-radius:0;border-bottom-left-radius:0;border-top-right-radius:6px;border-bottom-right-radius:6px;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>ECG</string></property><property name="checkable"><bool>true</bool></property></widget></item></layout></item><item><widget class="QPushButton" name="btnChIcon6"><property name="styleSheet"><string notr="true">QPushButton{background-color:transparent;border:none;min-width:26px;max-width:26px;min-height:26px;max-height:26px;padding:0px;qproperty-icon:url(icons/gamepad.svg);qproperty-iconSize:18px 18px;}QPushButton:hover{background-color:#1a1a1a;border-radius:4px;}</string></property><property name="text"><string></string></property><property name="toolTip"><string>Select Ch6 in Signal Inputs</string></property></widget></item></layout></widget></item>
+         <item><widget class="QGroupBox" name="grpNotch"><property name="title"><string>NOTCH FILTER</string></property><layout class="QHBoxLayout" name="notchHLayout"><property name="spacing"><number>10</number></property><property name="leftMargin"><number>10</number></property><property name="topMargin"><number>8</number></property><property name="rightMargin"><number>10</number></property><property name="bottomMargin"><number>8</number></property><item><layout class="QHBoxLayout" name="notchToggleLayout"><property name="spacing"><number>0</number></property><item><widget class="QPushButton" name="btnNotchOn"><property name="styleSheet"><string notr="true">QPushButton{border-right:none;border-top-left-radius:6px;border-bottom-left-radius:6px;border-top-right-radius:0;border-bottom-right-radius:0;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>On</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnNotchOff"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-top-left-radius:0;border-bottom-left-radius:0;border-top-right-radius:6px;border-bottom-right-radius:6px;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>Off</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item></layout></item><item><spacer name="notchMidSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint"><size><width>20</width><height>20</height></size></property></spacer></item><item><layout class="QHBoxLayout" name="notchFreqLayout"><property name="spacing"><number>0</number></property><item><widget class="QPushButton" name="btnNotch50Hz"><property name="styleSheet"><string notr="true">QPushButton{border-right:none;border-top-left-radius:6px;border-bottom-left-radius:6px;border-top-right-radius:0;border-bottom-right-radius:0;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>50 Hz</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="enabled"><bool>false</bool></property></widget></item><item><widget class="QPushButton" name="btnNotch60Hz"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-top-left-radius:0;border-bottom-left-radius:0;border-top-right-radius:6px;border-bottom-right-radius:6px;}QPushButton:checked{border:1px solid #ffffff;}</string></property><property name="text"><string>60 Hz</string></property><property name="checkable"><bool>true</bool></property><property name="enabled"><bool>false</bool></property></widget></item></layout></item></layout></widget></item>
+         <item><spacer name="configSpacer"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint"><size><width>20</width><height>20</height></size></property></spacer></item>
+
+        </layout>
+       </widget>
+      </item>
+
+      <!-- ═══ SIGNAL INPUTS ═══ -->
+      <item>
+       <widget class="QGroupBox" name="inputsGroup">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>1</horstretch><verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="title"><string>SIGNAL INPUTS</string></property>
+        <layout class="QVBoxLayout" name="inputsVLayout">
+         <property name="spacing"><number>12</number></property><property name="leftMargin"><number>14</number></property><property name="topMargin"><number>20</number></property><property name="rightMargin"><number>14</number></property><property name="bottomMargin"><number>14</number></property>
+
+         <item><layout class="QHBoxLayout" name="selRowInput"><property name="spacing"><number>0</number></property><item><widget class="QPushButton" name="btnSel_Input_All"><property name="styleSheet"><string notr="true">QPushButton{border-right:none;border-top-left-radius:6px;border-bottom-left-radius:6px;border-top-right-radius:0;border-bottom-right-radius:0;min-width:36px;font-size:11px;}QPushButton:checked{background-color:#ffffff;color:#000000;border:1px solid #ffffff;}</string></property><property name="text"><string>All</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnSel_Input_Ch1"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-right:none;border-radius:0;min-width:36px;font-size:11px;}QPushButton:checked{background-color:#ffffff;color:#000000;border:1px solid #ffffff;}</string></property><property name="text"><string>Ch1</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnSel_Input_Ch2"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-right:none;border-radius:0;min-width:36px;font-size:11px;}QPushButton:checked{background-color:#ffffff;color:#000000;border:1px solid #ffffff;}</string></property><property name="text"><string>Ch2</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnSel_Input_Ch3"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-right:none;border-radius:0;min-width:36px;font-size:11px;}QPushButton:checked{background-color:#ffffff;color:#000000;border:1px solid #ffffff;}</string></property><property name="text"><string>Ch3</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnSel_Input_Ch4"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-right:none;border-radius:0;min-width:36px;font-size:11px;}QPushButton:checked{background-color:#ffffff;color:#000000;border:1px solid #ffffff;}</string></property><property name="text"><string>Ch4</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnSel_Input_Ch5"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-right:none;border-radius:0;min-width:36px;font-size:11px;}QPushButton:checked{background-color:#ffffff;color:#000000;border:1px solid #ffffff;}</string></property><property name="text"><string>Ch5</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><widget class="QPushButton" name="btnSel_Input_Ch6"><property name="styleSheet"><string notr="true">QPushButton{border-left:none;border-top-left-radius:0;border-bottom-left-radius:0;border-top-right-radius:6px;border-bottom-right-radius:6px;min-width:36px;font-size:11px;}QPushButton:checked{background-color:#ffffff;color:#000000;border:1px solid #ffffff;}</string></property><property name="text"><string>Ch6</string></property><property name="checkable"><bool>true</bool></property></widget></item><item><spacer name="spacerSelInput"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint"><size><width>20</width><height>20</height></size></property></spacer></item></layout></item>
+
+         <item><layout class="QHBoxLayout" name="hLayoutFocus"><property name="spacing"><number>12</number></property><item><widget class="QLabel" name="lblFocus"><property name="minimumSize"><size><width>100</width><height>0</height></size></property><property name="text"><string> Focus</string></property></widget></item><item><widget class="QProgressBar" name="pbFocus"><property name="value"><number>0</number></property></widget></item></layout></item>
+         <item><layout class="QHBoxLayout" name="hLayoutBlink"><property name="spacing"><number>12</number></property><item><widget class="QLabel" name="lblBlink"><property name="minimumSize"><size><width>100</width><height>0</height></size></property><property name="text"><string> Blink</string></property></widget></item><item><widget class="QProgressBar" name="pbBlink"><property name="value"><number>0</number></property></widget></item></layout></item>
+         <item><layout class="QHBoxLayout" name="hLayoutJaw"><property name="spacing"><number>12</number></property><item><widget class="QLabel" name="lblJaw"><property name="minimumSize"><size><width>100</width><height>0</height></size></property><property name="text"><string> Jaw Clench</string></property></widget></item><item><widget class="QProgressBar" name="pbJaw"><property name="value"><number>0</number></property></widget></item></layout></item>
+         <item><layout class="QHBoxLayout" name="hLayoutECG"><property name="spacing"><number>12</number></property><item><widget class="QLabel" name="lblECG"><property name="minimumSize"><size><width>100</width><height>0</height></size></property><property name="text"><string> Heart Beat</string></property></widget></item><item><widget class="QProgressBar" name="pbECG"><property name="value"><number>0</number></property></widget></item></layout></item>
+         <item><layout class="QHBoxLayout" name="hLayoutEMG1"><property name="spacing"><number>12</number></property><item><widget class="QLabel" name="lblEMG1"><property name="minimumSize"><size><width>100</width><height>0</height></size></property><property name="text"><string> EMG(Ch1)</string></property></widget></item><item><widget class="QProgressBar" name="pbEMG1"><property name="value"><number>0</number></property></widget></item></layout></item>
+         <item><layout class="QHBoxLayout" name="hLayoutEMG2"><property name="spacing"><number>12</number></property><item><widget class="QLabel" name="lblEMG2"><property name="minimumSize"><size><width>100</width><height>0</height></size></property><property name="text"><string> EMG(Ch2)</string></property></widget></item><item><widget class="QProgressBar" name="pbEMG2"><property name="value"><number>0</number></property></widget></item></layout></item>
+         <item><layout class="QHBoxLayout" name="hLayoutEMG3"><property name="spacing"><number>12</number></property><item><widget class="QLabel" name="lblEMG3"><property name="minimumSize"><size><width>100</width><height>0</height></size></property><property name="text"><string> EMG(Ch3)</string></property></widget></item><item><widget class="QProgressBar" name="pbEMG3"><property name="value"><number>0</number></property></widget></item></layout></item>
+         <item><layout class="QHBoxLayout" name="hLayoutEMG4"><property name="spacing"><number>12</number></property><item><widget class="QLabel" name="lblEMG4"><property name="minimumSize"><size><width>100</width><height>0</height></size></property><property name="text"><string> EMG(Ch4)</string></property></widget></item><item><widget class="QProgressBar" name="pbEMG4"><property name="value"><number>0</number></property></widget></item></layout></item>
+
+         <item><spacer name="inputsSpacer"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint"><size><width>20</width><height>40</height></size></property></spacer></item>
+        </layout>
+       </widget>
+      </item>
+
+     </layout>
+    </item>
+
+    <!-- ═══ BOTTOM BUTTONS ═══ -->
+    <item>
+     <layout class="QHBoxLayout" name="bottomHLayout">
+      <property name="spacing"><number>14</number></property>
+      <item><spacer name="bottomSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint"><size><width>20</width><height>20</height></size></property></spacer></item>
+      <item>
+       <widget class="QPushButton" name="btnConnect">
+        <property name="minimumSize"><size><width>86</width><height>52</height></size></property>
+        <property name="styleSheet"><string notr="true">QPushButton {
+    qproperty-icon: url(icons/bluetooth.svg);
+    qproperty-iconSize: 18px 18px;
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #1a1a1a, stop:1 #0f0f0f);
+    border: 2px solid #3a3a3a;
+    border-radius: 10px;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    padding: 10px 18px;
+    text-align: left;
+}
+QPushButton:hover {
+    border: 2px solid #ffffff;
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #222222, stop:1 #111111);
+}
+QPushButton:pressed {
+    background-color: #0a0a0a;
+}
+QPushButton:checked {
+    border: 2px solid #ffffff;
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #101010, stop:1 #000000);
+}</string></property>
+        <property name="text"><string>CONNECT</string></property>
+        <property name="checkable"><bool>true</bool></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnKeybinds">
+        <property name="minimumSize"><size><width>86</width><height>52</height></size></property>
+        <property name="styleSheet"><string notr="true">QPushButton {
+    qproperty-icon: url(icons/gamepad.svg);
+    qproperty-iconSize: 18px 18px;
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #1a1a1a, stop:1 #0f0f0f);
+    border: 2px solid #3a3a3a;
+    border-radius: 10px;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    padding: 10px 18px;
+    text-align: left;
+}
+QPushButton:hover {
+    border: 2px solid #ffffff;
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #222222, stop:1 #111111);
+}
+QPushButton:pressed {
+    background-color: #0a0a0a;
+}
+QPushButton:checked {
+    border: 2px solid #ffffff;
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #101010, stop:1 #000000);
+}</string></property>
+        <property name="text"><string>KEYBINDS</string></property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+
+   </layout>
+  </widget>
+
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry"><rect><x>0</x><y>0</y><width>1183</width><height>33</height></rect></property>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

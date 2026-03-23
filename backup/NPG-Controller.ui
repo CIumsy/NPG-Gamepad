@@ -1,0 +1,2169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1183</width>
+    <height>738</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>820</width>
+    <height>520</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>NPG Gamepad Emulator</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">/* BLACK &amp; WHITE GAMING THEME - CORRECTED */
+
+QMainWindow, QWidget {
+    background-color: #0a0a0a;
+    font-family: &quot;Segoe UI&quot;, Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: #e8e8e8;
+}
+
+QScrollBar:vertical {
+    background: #141414;
+    width: 8px;
+    border-radius: 4px;
+}
+
+QScrollBar::handle:vertical {
+    background: #ffffff;
+    border-radius: 4px;
+}
+
+QGroupBox {
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 15px;
+    margin-top: 16px;
+    padding: 14px 12px;
+    background-color: #141414;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 16px;
+    top: 0px;
+    padding: 6px 10px;
+    background-color: #ffffff;
+    border-radius: 7px;
+    color: #0C0C0C;
+    font-size: 15px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+QCheckBox {
+    color: #e8e8e8;
+    spacing: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 4px 0px;
+    background-color: transparent;
+}
+
+QCheckBox:hover {
+    color: #ffffff;
+}
+
+QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    background-color: transparent;
+    border: 2px solid #3a3a3a;
+}
+
+QCheckBox::indicator:hover {
+    border: 2px solid #ffffff;
+}
+
+QCheckBox::indicator:checked {
+    background-color: transparent;
+    border: 2px solid #ffffff;
+    image: url(icons/check.svg);
+}
+
+QFrame[frameShape=&quot;4&quot;], QFrame[frameShape=&quot;5&quot;] {
+    color: #2a2a2a;
+    background-color: #2a2a2a;
+}
+
+QFrame[frameShape=&quot;4&quot;] {
+    max-height: 1px;
+    margin: 6px 0px;
+}
+
+QFrame[frameShape=&quot;5&quot;] {
+    max-width: 1px;
+    margin: 0px 8px;
+}
+
+QLabel {
+    color: #e8e8e8;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+QProgressBar {
+    background-color: #141414;
+    border: 1px solid #2a2a2a;
+    border-radius: 6px;
+    text-align: center;
+    color: transparent;
+    min-height: 26px;
+    max-height: 26px;
+}
+
+QProgressBar::chunk {
+    background-color: #ffffff;
+    border-radius: 5px;
+    margin: 1px;
+}
+
+QPushButton {
+    background-color: #141414;
+    border: 1px solid #3a3a3a;
+    border-radius: 6px;
+    color: #e8e8e8;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    min-width: 46px;
+}
+
+QPushButton:checked {
+    background-color: #1a1a1a;
+    border: 1px solid #ffffff;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+QPushButton:hover {
+    background-color: #1a1a1a;
+    border: 1px solid #ffffff;
+    color: #ffffff;
+}
+
+QLabel#lblFocus, QLabel#lblBlink, QLabel#lblJaw,
+QLabel#lblEMG1, QLabel#lblEMG2, QLabel#lblEMG3, QLabel#lblEMG4, QLabel#lblECG {
+    background-color: transparent;
+}
+
+QPushButton:pressed {
+    background-color: #0a0a0a;
+}
+
+/* ── Disabled state ─────────────────────────────────────── */
+
+QPushButton:disabled {
+    background-color: #0d0d0d;
+    border: 1px solid #1e1e1e;
+    color: #333333;
+}
+
+QCheckBox:disabled {
+    color: #333333;
+}
+
+QCheckBox::indicator:disabled {
+    border: 2px solid #222222;
+    background-color: transparent;
+}
+
+QLabel:disabled {
+    color: #333333;
+}</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="mainVLayout">
+    <property name="spacing">
+     <number>12</number>
+    </property>
+    <property name="leftMargin">
+     <number>12</number>
+    </property>
+    <property name="topMargin">
+     <number>12</number>
+    </property>
+    <property name="rightMargin">
+     <number>12</number>
+    </property>
+    <property name="bottomMargin">
+     <number>12</number>
+    </property>
+    <item>
+     <layout class="QHBoxLayout" name="contentHLayout">
+      <property name="spacing">
+       <number>12</number>
+      </property>
+      <item>
+       <widget class="QGroupBox" name="configGroup">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>420</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="title">
+         <string>SIGNAL CONFIGURATION</string>
+        </property>
+        <layout class="QHBoxLayout" name="configHLayout">
+         <property name="spacing">
+          <number>28</number>
+         </property>
+         <property name="leftMargin">
+          <number>14</number>
+         </property>
+         <property name="topMargin">
+          <number>20</number>
+         </property>
+         <property name="rightMargin">
+          <number>14</number>
+         </property>
+         <property name="bottomMargin">
+          <number>14</number>
+         </property>
+         <item>
+          <layout class="QVBoxLayout" name="channelsVLayout">
+           <property name="spacing">
+            <number>7</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="lblChannels">
+             <property name="styleSheet">
+              <string notr="true">QLabel { 
+    color: #0C0C0C; 
+    font-weight: 700; 
+    font-size: 12px; 
+    letter-spacing: 2px; 
+    background-color: #ffffff;
+    padding: 6px 12px;
+    border-radius: 6px;
+}</string>
+             </property>
+             <property name="text">
+              <string>CHANNELS</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="Line" name="lineChannels">
+             <property name="frameShadow">
+              <enum>QFrame::Shadow::Plain</enum>
+             </property>
+             <property name="orientation">
+              <enum>Qt::Orientation::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="chkSelectAll">
+             <property name="text">
+              <string>Select All</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="chkCh1">
+             <property name="text">
+              <string>Ch 1</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="chkCh2">
+             <property name="text">
+              <string>Ch 2</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="chkCh3">
+             <property name="text">
+              <string>Ch 3</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="chkCh4">
+             <property name="text">
+              <string>Ch 4</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="chkCh5">
+             <property name="text">
+              <string>Ch 5</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="chkCh6">
+             <property name="text">
+              <string>Ch 6</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="channelsSpacer">
+             <property name="orientation">
+              <enum>Qt::Orientation::Vertical</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>40</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QFrame" name="vDivider1">
+           <property name="frameShape">
+            <enum>QFrame::Shape::VLine</enum>
+           </property>
+           <property name="frameShadow">
+            <enum>QFrame::Shadow::Plain</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QVBoxLayout" name="notchVLayout">
+           <property name="spacing">
+            <number>7</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="lblNotch">
+             <property name="styleSheet">
+              <string notr="true">QLabel { 
+    color: #0C0C0C; 
+    font-weight: 700; 
+    font-size: 12px; 
+    letter-spacing: 2px;
+    background-color: #ffffff;
+    padding: 6px 12px;
+    border-radius: 6px;
+}</string>
+             </property>
+             <property name="text">
+              <string>NOTCH FILTER</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="Line" name="lineNotch">
+             <property name="frameShadow">
+              <enum>QFrame::Shadow::Plain</enum>
+             </property>
+             <property name="orientation">
+              <enum>Qt::Orientation::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblNotchAll">
+             <property name="styleSheet">
+              <string notr="true">QLabel { 
+    color: #b0b0b0; 
+    font-size: 11px; 
+    font-weight: 700;
+    background-color: transparent;
+    padding: 0px;
+}</string>
+             </property>
+             <property name="text">
+              <string>All Channels:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="notchAllLayout">
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QPushButton" name="btnNotchAllOff">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-right: none;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>Off</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnNotchAll50">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>50Hz</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnNotchAll60">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-left: none;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>60Hz</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="Line" name="lineNotchSep">
+             <property name="frameShadow">
+              <enum>QFrame::Shadow::Plain</enum>
+             </property>
+             <property name="orientation">
+              <enum>Qt::Orientation::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblNotchCh1">
+             <property name="styleSheet">
+              <string notr="true">QLabel { color: #b0b0b0; font-size: 11px; background-color: transparent; padding: 0px; }</string>
+             </property>
+             <property name="text">
+              <string>Ch1:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="notchCh1Layout">
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QPushButton" name="btnNotchCh1Off">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-right: none;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>Off</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnNotchCh150">
+               <property name="styleSheet">
+                <string notr="true">QPushButton { 
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked { border: 1px solid #ffffff; }</string>
+               </property>
+               <property name="text">
+                <string>50Hz</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnNotchCh160">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-left: none;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>60Hz</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblNotchCh2">
+             <property name="styleSheet">
+              <string notr="true">QLabel { color: #b0b0b0; font-size: 11px; background-color: transparent; padding: 0px; }</string>
+             </property>
+             <property name="text">
+              <string>Ch2:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="notchCh2Layout">
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QPushButton" name="btnNotchCh2Off">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-right: none;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>Off</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnNotchCh250">
+               <property name="styleSheet">
+                <string notr="true">QPushButton { 
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked { border: 1px solid #ffffff; }</string>
+               </property>
+               <property name="text">
+                <string>50Hz</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnNotchCh260">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-left: none;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>60Hz</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblNotchCh3">
+             <property name="styleSheet">
+              <string notr="true">QLabel { color: #b0b0b0; font-size: 11px; background-color: transparent; padding: 0px; }</string>
+             </property>
+             <property name="text">
+              <string>Ch3:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="notchCh3Layout">
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QPushButton" name="btnNotchCh3Off">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-right: none;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>Off</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnNotchCh350">
+               <property name="styleSheet">
+                <string notr="true">QPushButton { 
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked { border: 1px solid #ffffff; }</string>
+               </property>
+               <property name="text">
+                <string>50Hz</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnNotchCh360">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-left: none;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>60Hz</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblNotchCh4">
+             <property name="styleSheet">
+              <string notr="true">QLabel { color: #b0b0b0; font-size: 11px; background-color: transparent; padding: 0px; }</string>
+             </property>
+             <property name="text">
+              <string>Ch4:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="notchCh4Layout">
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QPushButton" name="btnNotchCh4Off">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-right: none;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>Off</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnNotchCh450">
+               <property name="styleSheet">
+                <string notr="true">QPushButton { 
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked { border: 1px solid #ffffff; }</string>
+               </property>
+               <property name="text">
+                <string>50Hz</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnNotchCh460">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-left: none;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>60Hz</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblNotchCh5">
+             <property name="styleSheet">
+              <string notr="true">QLabel { color: #b0b0b0; font-size: 11px; background-color: transparent; padding: 0px; }</string>
+             </property>
+             <property name="text">
+              <string>Ch5:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="notchCh5Layout">
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QPushButton" name="btnNotchCh5Off">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-right: none;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>Off</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnNotchCh550">
+               <property name="styleSheet">
+                <string notr="true">QPushButton { 
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked { border: 1px solid #ffffff; }</string>
+               </property>
+               <property name="text">
+                <string>50Hz</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnNotchCh560">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-left: none;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>60Hz</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblNotchCh6">
+             <property name="styleSheet">
+              <string notr="true">QLabel { color: #b0b0b0; font-size: 11px; background-color: transparent; padding: 0px; }</string>
+             </property>
+             <property name="text">
+              <string>Ch6:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="notchCh6Layout">
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QPushButton" name="btnNotchCh6Off">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-right: none;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>Off</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnNotchCh650">
+               <property name="styleSheet">
+                <string notr="true">QPushButton { 
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked { border: 1px solid #ffffff; }</string>
+               </property>
+               <property name="text">
+                <string>50Hz</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnNotchCh660">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-left: none;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>60Hz</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <spacer name="notchSpacer">
+             <property name="orientation">
+              <enum>Qt::Orientation::Vertical</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>40</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QFrame" name="vDivider2">
+           <property name="frameShape">
+            <enum>QFrame::Shape::VLine</enum>
+           </property>
+           <property name="frameShadow">
+            <enum>QFrame::Shadow::Plain</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QVBoxLayout" name="filtersVLayout">
+           <property name="spacing">
+            <number>7</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="lblFilters">
+             <property name="styleSheet">
+              <string notr="true">QLabel { 
+    color: #0C0C0C; 
+    font-weight: 700; 
+    font-size: 12px; 
+    letter-spacing: 2px;
+    background-color: #ffffff;
+    padding: 6px 12px;
+    border-radius: 6px;
+}</string>
+             </property>
+             <property name="text">
+              <string>FILTERS</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="Line" name="lineFilters">
+             <property name="frameShadow">
+              <enum>QFrame::Shadow::Plain</enum>
+             </property>
+             <property name="orientation">
+              <enum>Qt::Orientation::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblFilterCh1">
+             <property name="styleSheet">
+              <string notr="true">QLabel { color: #b0b0b0; font-size: 11px; background-color: transparent; padding: 0px; }</string>
+             </property>
+             <property name="text">
+              <string>Ch1:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="filterCh1Layout">
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh1None">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-right: none;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>None</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh1EEG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton { 
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked { border: 1px solid #ffffff; }</string>
+               </property>
+               <property name="text">
+                <string>EEG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh1EMG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton { 
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked { border: 1px solid #ffffff; }</string>
+               </property>
+               <property name="text">
+                <string>EMG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh1ECG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}
+</string>
+               </property>
+               <property name="text">
+                <string>ECG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh1EOG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-left: none;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>EOG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblFilterCh2">
+             <property name="styleSheet">
+              <string notr="true">QLabel { color: #b0b0b0; font-size: 11px; background-color: transparent; padding: 0px; }</string>
+             </property>
+             <property name="text">
+              <string>Ch2:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="filterCh2Layout">
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh2None">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-right: none;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>None</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh2EEG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton { 
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked { border: 1px solid #ffffff; }</string>
+               </property>
+               <property name="text">
+                <string>EEG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh2EMG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton { 
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked { border: 1px solid #ffffff; }</string>
+               </property>
+               <property name="text">
+                <string>EMG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh2ECG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}
+</string>
+               </property>
+               <property name="text">
+                <string>ECG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh2EOG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-left: none;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>EOG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblFilterCh3">
+             <property name="styleSheet">
+              <string notr="true">QLabel { color: #b0b0b0; font-size: 11px; background-color: transparent; padding: 0px; }</string>
+             </property>
+             <property name="text">
+              <string>Ch3:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="filterCh3Layout">
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh3None">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-right: none;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>None</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh3EEG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton { 
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked { border: 1px solid #ffffff; }</string>
+               </property>
+               <property name="text">
+                <string>EEG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh3EMG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton { 
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked { border: 1px solid #ffffff; }</string>
+               </property>
+               <property name="text">
+                <string>EMG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh3ECG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}
+</string>
+               </property>
+               <property name="text">
+                <string>ECG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh3EOG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-left: none;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>EOG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblFilterCh4">
+             <property name="styleSheet">
+              <string notr="true">QLabel { color: #b0b0b0; font-size: 11px; background-color: transparent; padding: 0px; }</string>
+             </property>
+             <property name="text">
+              <string>Ch4:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="filterCh4Layout">
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh4None">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-right: none;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>None</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh4EEG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton { 
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked { border: 1px solid #ffffff; }</string>
+               </property>
+               <property name="text">
+                <string>EEG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh4EMG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton { 
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked { border: 1px solid #ffffff; }</string>
+               </property>
+               <property name="text">
+                <string>EMG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh4ECG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}
+</string>
+               </property>
+               <property name="text">
+                <string>ECG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh4EOG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-left: none;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>EOG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblFilterCh5">
+             <property name="styleSheet">
+              <string notr="true">QLabel { color: #b0b0b0; font-size: 11px; background-color: transparent; padding: 0px; }</string>
+             </property>
+             <property name="text">
+              <string>Ch5:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="filterCh5Layout">
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh5None">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-right: none;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>None</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh5EEG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton { 
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked { border: 1px solid #ffffff; }</string>
+               </property>
+               <property name="text">
+                <string>EEG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh5EMG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton { 
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked { border: 1px solid #ffffff; }</string>
+               </property>
+               <property name="text">
+                <string>EMG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh5ECG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}
+</string>
+               </property>
+               <property name="text">
+                <string>ECG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh5EOG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-left: none;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>EOG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblFilterCh6">
+             <property name="styleSheet">
+              <string notr="true">QLabel { color: #b0b0b0; font-size: 11px; background-color: transparent; padding: 0px; }</string>
+             </property>
+             <property name="text">
+              <string>Ch6:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="filterCh6Layout">
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh6None">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-right: none;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>None</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh6EEG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton { 
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked { border: 1px solid #ffffff; }</string>
+               </property>
+               <property name="text">
+                <string>EEG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh6EMG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton { 
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked { border: 1px solid #ffffff; }</string>
+               </property>
+               <property name="text">
+                <string>EMG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh6ECG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}
+</string>
+               </property>
+               <property name="text">
+                <string>ECG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnFilterCh6EOG">
+               <property name="styleSheet">
+                <string notr="true">QPushButton {
+    border-left: none;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+QPushButton:checked {
+    border: 1px solid #ffffff;
+}</string>
+               </property>
+               <property name="text">
+                <string>EOG</string>
+               </property>
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <spacer name="filtersSpacer">
+             <property name="orientation">
+              <enum>Qt::Orientation::Vertical</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>40</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="inputsGroup">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>1</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="title">
+         <string>SIGNAL INPUTS</string>
+        </property>
+        <layout class="QVBoxLayout" name="inputsVLayout">
+         <property name="spacing">
+          <number>12</number>
+         </property>
+         <property name="leftMargin">
+          <number>14</number>
+         </property>
+         <property name="topMargin">
+          <number>20</number>
+         </property>
+         <property name="rightMargin">
+          <number>14</number>
+         </property>
+         <property name="bottomMargin">
+          <number>14</number>
+         </property>
+         <item>
+          <layout class="QHBoxLayout" name="hLayoutFocus">
+           <property name="spacing">
+            <number>12</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="lblFocus">
+             <property name="minimumSize">
+              <size>
+               <width>100</width>
+               <height>0</height>
+              </size>
+             </property>
+             <property name="text">
+              <string> Focus</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QProgressBar" name="pbFocus">
+             <property name="value">
+              <number>0</number>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="hLayoutBlink">
+           <property name="spacing">
+            <number>12</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="lblBlink">
+             <property name="minimumSize">
+              <size>
+               <width>100</width>
+               <height>0</height>
+              </size>
+             </property>
+             <property name="text">
+              <string> Blink</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QProgressBar" name="pbBlink">
+             <property name="value">
+              <number>0</number>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="hLayoutJaw">
+           <property name="spacing">
+            <number>12</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="lblJaw">
+             <property name="minimumSize">
+              <size>
+               <width>100</width>
+               <height>0</height>
+              </size>
+             </property>
+             <property name="text">
+              <string> Jaw Clench</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QProgressBar" name="pbJaw">
+             <property name="value">
+              <number>0</number>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="hLayoutJaw_2">
+           <property name="spacing">
+            <number>12</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="lblECG">
+             <property name="minimumSize">
+              <size>
+               <width>100</width>
+               <height>0</height>
+              </size>
+             </property>
+             <property name="text">
+              <string> Heart Beat</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QProgressBar" name="pbJaw_2">
+             <property name="value">
+              <number>0</number>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="hLayoutEMG1">
+           <property name="spacing">
+            <number>12</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="lblEMG1">
+             <property name="minimumSize">
+              <size>
+               <width>100</width>
+               <height>0</height>
+              </size>
+             </property>
+             <property name="text">
+              <string> EMG(Ch1)</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QProgressBar" name="pbEMG1">
+             <property name="value">
+              <number>0</number>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="hLayoutEMG2">
+           <property name="spacing">
+            <number>12</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="lblEMG2">
+             <property name="minimumSize">
+              <size>
+               <width>100</width>
+               <height>0</height>
+              </size>
+             </property>
+             <property name="text">
+              <string> EMG(Ch2)</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QProgressBar" name="pbEMG2">
+             <property name="value">
+              <number>0</number>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="hLayoutEMG3">
+           <property name="spacing">
+            <number>12</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="lblEMG3">
+             <property name="minimumSize">
+              <size>
+               <width>100</width>
+               <height>0</height>
+              </size>
+             </property>
+             <property name="text">
+              <string> EMG(Ch3)</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QProgressBar" name="pbEMG3">
+             <property name="value">
+              <number>0</number>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="hLayoutEMG4">
+           <property name="spacing">
+            <number>12</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="lblEMG4">
+             <property name="minimumSize">
+              <size>
+               <width>100</width>
+               <height>0</height>
+              </size>
+             </property>
+             <property name="text">
+              <string> EMG(Ch4)</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QProgressBar" name="pbEMG4">
+             <property name="value">
+              <number>0</number>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <spacer name="inputsSpacer">
+           <property name="orientation">
+            <enum>Qt::Orientation::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>40</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="bottomHLayout">
+      <property name="spacing">
+       <number>14</number>
+      </property>
+      <item>
+       <spacer name="bottomSpacer">
+        <property name="orientation">
+         <enum>Qt::Orientation::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnConnect">
+        <property name="minimumSize">
+         <size>
+          <width>86</width>
+          <height>52</height>
+         </size>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QPushButton {
+    qproperty-icon: url(icons/bluetooth.svg);
+    qproperty-iconSize: 18px 18px;
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #1a1a1a, stop:1 #0f0f0f);
+    border: 2px solid #3a3a3a;
+    border-radius: 10px;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    padding: 10px 18px;
+    text-align: left;
+}
+QPushButton:hover {
+    border: 2px solid #ffffff;
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #222222, stop:1 #111111);
+}
+QPushButton:pressed {
+    background-color: #0a0a0a;
+}
+QPushButton:checked {
+    border: 2px solid #ffffff;
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #101010, stop:1 #000000);
+}</string>
+        </property>
+        <property name="text">
+         <string>CONNECT</string>
+        </property>
+        <property name="checkable">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnKeybinds">
+        <property name="minimumSize">
+         <size>
+          <width>86</width>
+          <height>52</height>
+         </size>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QPushButton {
+    qproperty-icon: url(icons/gamepad.svg);
+    qproperty-iconSize: 18px 18px;
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #1a1a1a, stop:1 #0f0f0f);
+    border: 2px solid #3a3a3a;
+    border-radius: 10px;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    padding: 10px 18px;
+    text-align: left;
+}
+QPushButton:hover {
+    border: 2px solid #ffffff;
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #222222, stop:1 #111111);
+}
+QPushButton:pressed {
+    background-color: #0a0a0a;
+}
+QPushButton:checked {
+    border: 2px solid #ffffff;
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #101010, stop:1 #000000);
+}</string>
+        </property>
+        <property name="text">
+         <string>KEYBINDS</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1183</width>
+     <height>33</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
