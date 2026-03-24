@@ -637,9 +637,6 @@ class NPGController:
             """
 
         self.ui.grpNotch.setStyleSheet(_badge_css('grpNotch'))
-        self.ui.grpDoubleBlink.setStyleSheet(_badge_css('grpDoubleBlink'))
-        self.ui.grpTripleBlink.setStyleSheet(_badge_css('grpTripleBlink'))
-        self.ui.grpDoubleJawClench.setStyleSheet(_badge_css('grpDoubleJawClench'))
 
     # ── Handlers: Connect / Disconnect ───────────────────────────────────────
 
@@ -843,8 +840,11 @@ class NPGController:
                 pb.setVisible(False)
                 cmb.setVisible(False)
             self.ui.grpDoubleBlink.setVisible(False)
+            self.ui.cmbDoubleBlink.setVisible(False)
             self.ui.grpTripleBlink.setVisible(False)
+            self.ui.cmbTripleBlink.setVisible(False)
             self.ui.grpDoubleJawClench.setVisible(False)
+            self.ui.cmbDoubleJawClench.setVisible(False)
 
         # Not connected — hide everything
         if not self.is_connected:
@@ -891,8 +891,11 @@ class NPGController:
 
             # Detection sub-rows
             self.ui.grpDoubleBlink.setVisible(has_eeg)
+            self.ui.cmbDoubleBlink.setVisible(has_eeg)
             self.ui.grpTripleBlink.setVisible(has_eeg)
+            self.ui.cmbTripleBlink.setVisible(has_eeg)
             self.ui.grpDoubleJawClench.setVisible(has_jaw)
+            self.ui.cmbDoubleJawClench.setVisible(has_jaw)
 
             for i, (lbl, pb, cmb) in enumerate(emg_slots):
                 if i < len(emg_chs):
@@ -908,8 +911,11 @@ class NPGController:
             # Specific channel — only show if the channel is actually checked
             hide_all()
             self.ui.grpDoubleBlink.setVisible(False)
+            self.ui.cmbDoubleBlink.setVisible(False)
             self.ui.grpTripleBlink.setVisible(False)
+            self.ui.cmbTripleBlink.setVisible(False)
             self.ui.grpDoubleJawClench.setVisible(False)
+            self.ui.cmbDoubleJawClench.setVisible(False)
             ch_idx = sel - 1
             if ch_idx < self.num_channels:
                 cb = getattr(self.ui, f'grpCh{sel}')
@@ -921,14 +927,18 @@ class NPGController:
                             fixed[k][1].setVisible(True)
                             fixed[k][2].setVisible(True)
                         self.ui.grpDoubleBlink.setVisible(True)
+                        self.ui.cmbDoubleBlink.setVisible(True)
                         self.ui.grpTripleBlink.setVisible(True)
+                        self.ui.cmbTripleBlink.setVisible(True)
                         self.ui.grpDoubleJawClench.setVisible(True)
+                        self.ui.cmbDoubleJawClench.setVisible(True)
                     elif ftype == 'eog':
                         for k in ('leftEye', 'rightEye', 'jaw'):
                             fixed[k][0].setVisible(True)
                             fixed[k][1].setVisible(True)
                             fixed[k][2].setVisible(True)
                         self.ui.grpDoubleJawClench.setVisible(True)
+                        self.ui.cmbDoubleJawClench.setVisible(True)
                     elif ftype == 'ecg':
                         fixed['ecg'][0].setVisible(True)
                         fixed['ecg'][1].setVisible(True)

@@ -62,6 +62,7 @@ QGroupBox::title {
 }
 
 QCheckBox {
+    outline: none;
     color: #e8e8e8;
     spacing: 10px;
     font-size: 13px;
@@ -70,7 +71,7 @@ QCheckBox {
     background-color: transparent;
 }
 
-QCheckBox:hover {
+QCheckBox:hover:enabled, QCheckBox:focus:enabled {
     color: #ffffff;
 }
 
@@ -82,8 +83,8 @@ QCheckBox::indicator {
     border: 2px solid #3a3a3a;
     transition: border 0.2s, background 0.2s;
 }
-QCheckBox::indicator:hover,
-QCheckBox::indicator:focus {
+QCheckBox::indicator:hover:enabled,
+QCheckBox::indicator:focus:enabled {
     border: 2px solid #ffffff;
 }
 QCheckBox::indicator:checked {
@@ -91,8 +92,8 @@ QCheckBox::indicator:checked {
     border: 2px solid #ffffff;
     image: url(icons/check.svg);
 }
-QCheckBox::indicator:checked:hover,
-QCheckBox::indicator:checked:focus {
+QCheckBox::indicator:checked:hover:enabled,
+QCheckBox::indicator:checked:focus:enabled {
     background-color: #0a0a0a;
     border: 2px solid #ffffff;
     image: url(icons/check.svg);
@@ -1224,40 +1225,57 @@ QPushButton:checked:disabled {
              <number>12</number>
             </property>
             <item>
-             <widget class="QGroupBox" name="grpDoubleBlink">
-              <property name="title">
+             <widget class="QCheckBox" name="grpDoubleBlink">
+              <property name="text">
                <string> Double Blink</string>
-              </property>
-              <property name="checkable">
-               <bool>true</bool>
               </property>
               <property name="checked">
                <bool>false</bool>
               </property>
-              <layout class="QHBoxLayout" name="hLayoutDoubleBlink">
-               <item>
-                <widget class="QComboBox" name="cmbDoubleBlink"/>
-               </item>
-              </layout>
              </widget>
             </item>
             <item>
-             <widget class="QGroupBox" name="grpTripleBlink">
-              <property name="title">
-               <string> Triple Blink</string>
+             <widget class="QComboBox" name="cmbDoubleBlink">
+              <property name="minimumSize">
+               <size>
+                <width>80</width>
+                <height>0</height>
+               </size>
               </property>
-              <property name="checkable">
-               <bool>true</bool>
+             </widget>
+            </item>
+            <item>
+             <widget class="QCheckBox" name="grpTripleBlink">
+              <property name="text">
+               <string> Triple Blink</string>
               </property>
               <property name="checked">
                <bool>false</bool>
               </property>
-              <layout class="QHBoxLayout" name="hLayoutTripleBlink">
-               <item>
-                <widget class="QComboBox" name="cmbTripleBlink"/>
-               </item>
-              </layout>
              </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="cmbTripleBlink">
+              <property name="minimumSize">
+               <size>
+                <width>80</width>
+                <height>0</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="spacerBlinkSub">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
             </item>
            </layout>
           </item>
@@ -1378,22 +1396,37 @@ QPushButton:checked:disabled {
              <number>12</number>
             </property>
             <item>
-             <widget class="QGroupBox" name="grpDoubleJawClench">
-              <property name="title">
-               <string> Double Jaw</string>
-              </property>
-              <property name="checkable">
-               <bool>true</bool>
+             <widget class="QCheckBox" name="grpDoubleJawClench">
+              <property name="text">
+               <string> Double Jaw Clench</string>
               </property>
               <property name="checked">
                <bool>false</bool>
               </property>
-              <layout class="QHBoxLayout" name="hLayoutDoubleJawClench">
-               <item>
-                <widget class="QComboBox" name="cmbDoubleJawClench"/>
-               </item>
-              </layout>
              </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="cmbDoubleJawClench">
+              <property name="minimumSize">
+               <size>
+                <width>80</width>
+                <height>0</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="spacerJawSub">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
             </item>
            </layout>
           </item>
