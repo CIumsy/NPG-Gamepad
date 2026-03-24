@@ -1217,9 +1217,52 @@ QPushButton:checked:disabled {
             </widget>
            </item>
           </layout>
-         </item>
-         <item>
-          <layout class="QHBoxLayout" name="hLayoutLeftEye">
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="hLayoutBlinkSub">
+            <property name="spacing">
+             <number>12</number>
+            </property>
+            <item>
+             <widget class="QGroupBox" name="grpDoubleBlink">
+              <property name="title">
+               <string> Double Blink</string>
+              </property>
+              <property name="checkable">
+               <bool>true</bool>
+              </property>
+              <property name="checked">
+               <bool>false</bool>
+              </property>
+              <layout class="QHBoxLayout" name="hLayoutDoubleBlink">
+               <item>
+                <widget class="QComboBox" name="cmbDoubleBlink"/>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="grpTripleBlink">
+              <property name="title">
+               <string> Triple Blink</string>
+              </property>
+              <property name="checkable">
+               <bool>true</bool>
+              </property>
+              <property name="checked">
+               <bool>false</bool>
+              </property>
+              <layout class="QHBoxLayout" name="hLayoutTripleBlink">
+               <item>
+                <widget class="QComboBox" name="cmbTripleBlink"/>
+               </item>
+              </layout>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="hLayoutLeftEye">
            <property name="spacing">
             <number>12</number>
            </property>
@@ -1328,9 +1371,34 @@ QPushButton:checked:disabled {
             </widget>
            </item>
           </layout>
-         </item>
-         <item>
-          <layout class="QHBoxLayout" name="hLayoutECG">
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="hLayoutJawSub">
+            <property name="spacing">
+             <number>12</number>
+            </property>
+            <item>
+             <widget class="QGroupBox" name="grpDoubleJawClench">
+              <property name="title">
+               <string> Double Jaw</string>
+              </property>
+              <property name="checkable">
+               <bool>true</bool>
+              </property>
+              <property name="checked">
+               <bool>false</bool>
+              </property>
+              <layout class="QHBoxLayout" name="hLayoutDoubleJawClench">
+               <item>
+                <widget class="QComboBox" name="cmbDoubleJawClench"/>
+               </item>
+              </layout>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="hLayoutECG">
            <property name="spacing">
             <number>12</number>
            </property>

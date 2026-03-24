@@ -297,9 +297,20 @@ class NPGController:
         # Virtual gamepad
         self.gamepad = None
         self._pressed_buttons = set()  # currently pressed XUSB buttons
+        self._detection_flash_keys = set()  # keys currently being flashed by detection events
 
         # Test Controller Window
         self.test_dialog = None
+
+        # Blink / Jaw Clench detectors
+        from Algorithms.BlinkDetector import BlinkDetector
+        from Algorithms.JawClenchDetector import JawClenchDetector
+        self.blink_detector = BlinkDetector()
+        self.jaw_detector = JawClenchDetector()
+        self.last_blink_event = None
+        self.last_jaw_event = None
+        self._blink_action_timer = 0
+        self._jaw_action_timer = 0
 
         # BLE
         self.ble = BLEManager()
@@ -319,6 +330,10 @@ class NPGController:
         self._set_channel_enabled(0)
         # Uncheck "All" so it doesn't look selected at startup
         self.ui.btnSel_Input_All.setChecked(False)
+        # Hide detection sub-rows initially
+        self.ui.grpDoubleBlink.setVisible(False)
+        self.ui.grpTripleBlink.setVisible(False)
+        self.ui.grpDoubleJawClench.setVisible(False)
         self._update_input_visibility()
 
     # ── Threshold Bars ────────────────────────────────────────────────────────
@@ -387,7 +402,9 @@ class NPGController:
         cmb_list = [
             self.ui.cmbFocus, self.ui.cmbBlink, self.ui.cmbLeftEye, 
             self.ui.cmbRightEye, self.ui.cmbJaw, self.ui.cmbECG,
-            self.ui.cmbEMG1, self.ui.cmbEMG2, self.ui.cmbEMG3, self.ui.cmbEMG4
+            self.ui.cmbEMG1, self.ui.cmbEMG2, self.ui.cmbEMG3, self.ui.cmbEMG4,
+            self.ui.cmbDoubleBlink, self.ui.cmbTripleBlink,
+            self.ui.cmbDoubleJawClench,
         ]
         
         for cmb in cmb_list:
@@ -565,59 +582,64 @@ class NPGController:
             }}
             """
             grp.setStyleSheet(inline_css)
-            
-        # Ensure grpNotch safely adopts correct title disabled/enabled pseudo-states
-        notch_css = """
-        QGroupBox#grpNotch {
-            background-color: transparent;
-            border: 1px solid #ffffff;  /* Box outer line bright white when active */
-            border-radius: 8px;
-            margin-top: 14px;
-            margin-bottom: 6px;
-            padding-top: 14px; 
-            padding-bottom: 6px;
-            padding-left: 8px;
-            padding-right: 8px;
-        }
-        QGroupBox#grpNotch:disabled, QGroupBox#grpNotch:unchecked {
-            border: 1px solid #2a2a2a; /* Greyed out box when inactive or unchecked */
-        }
-        QGroupBox#grpNotch::title {
-            background-color: #0a0a0a;
-            border: 1px solid #ffffff;
-            color: #ffffff;
-            font-size: 11px;
-            padding: 3px 8px;
-            border-radius: 5px;
-            subcontrol-origin: margin;
-            subcontrol-position: top left;
-            left: 12px;
-        }
-        QGroupBox#grpNotch::title:disabled, QGroupBox#grpNotch::title:unchecked {
-            border: 1px solid #333333;
-            color: #333333;
-        }
-        QGroupBox#grpNotch::indicator {
-            width: 16px; 
-            height: 16px;
-            border-radius: 4px;
-            background-color: transparent;
-            border: 2px solid #3a3a3a;
-            margin-right: 6px;
-            margin-top: 1px;
-        }
-        QGroupBox#grpNotch::indicator:checked {
-            background-color: #0a0a0a;
-            border: 2px solid #ffffff;
-            image: url(icons/check.svg);
-        }
-        QGroupBox#grpNotch::indicator:disabled, QGroupBox#grpNotch::indicator:unchecked {
-            border: 2px solid #222222;
-            background-color: transparent;
-            image: none;
-        }
-        """
-        self.ui.grpNotch.setStyleSheet(notch_css)
+
+        # Style for Notch and detection sub-groupboxes (shared template)
+        def _badge_css(obj_name):
+            return f"""
+            QGroupBox#{obj_name} {{
+                background-color: transparent;
+                border: 1px solid #ffffff;
+                border-radius: 8px;
+                margin-top: 14px;
+                margin-bottom: 6px;
+                padding-top: 14px;
+                padding-bottom: 6px;
+                padding-left: 8px;
+                padding-right: 8px;
+            }}
+            QGroupBox#{obj_name}:disabled, QGroupBox#{obj_name}:unchecked {{
+                border: 1px solid #2a2a2a;
+            }}
+            QGroupBox#{obj_name}::title {{
+                background-color: #0a0a0a;
+                border: 1px solid #ffffff;
+                color: #ffffff;
+                font-size: 11px;
+                padding: 3px 8px;
+                border-radius: 5px;
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 12px;
+            }}
+            QGroupBox#{obj_name}::title:disabled, QGroupBox#{obj_name}::title:unchecked {{
+                border: 1px solid #333333;
+                color: #333333;
+            }}
+            QGroupBox#{obj_name}::indicator {{
+                width: 16px;
+                height: 16px;
+                border-radius: 4px;
+                background-color: transparent;
+                border: 2px solid #3a3a3a;
+                margin-right: 6px;
+                margin-top: 1px;
+            }}
+            QGroupBox#{obj_name}::indicator:checked {{
+                background-color: #0a0a0a;
+                border: 2px solid #ffffff;
+                image: url(icons/check.svg);
+            }}
+            QGroupBox#{obj_name}::indicator:disabled, QGroupBox#{obj_name}::indicator:unchecked {{
+                border: 2px solid #222222;
+                background-color: transparent;
+                image: none;
+            }}
+            """
+
+        self.ui.grpNotch.setStyleSheet(_badge_css('grpNotch'))
+        self.ui.grpDoubleBlink.setStyleSheet(_badge_css('grpDoubleBlink'))
+        self.ui.grpTripleBlink.setStyleSheet(_badge_css('grpTripleBlink'))
+        self.ui.grpDoubleJawClench.setStyleSheet(_badge_css('grpDoubleJawClench'))
 
     # ── Handlers: Connect / Disconnect ───────────────────────────────────────
 
@@ -674,14 +696,19 @@ class NPGController:
             self.processors[ch].set_filter(FILTER_MAP.get(filter_id, 'emg'))
         self._apply_notch_to_all()
 
-        # Create virtual gamepad
+        # Create virtual gamepad (retry up to 3 times if ViGEmBus is slow)
         if HAS_VGAMEPAD and self.gamepad is None:
-            try:
-                self.gamepad = vg.VX360Gamepad()
-                print("🎮 Virtual gamepad created")
-            except Exception as e:
-                print(f"⚠️  Could not create gamepad: {e}")
-                self.gamepad = None
+            import time
+            for attempt in range(1, 4):
+                try:
+                    self.gamepad = vg.VX360Gamepad()
+                    print("🎮 Virtual gamepad created")
+                    break
+                except Exception as e:
+                    print(f"⚠️  Gamepad attempt {attempt}/3 failed: {e}")
+                    self.gamepad = None
+                    if attempt < 3:
+                        time.sleep(0.5)
 
         # Select Ch1 in input selector and show its bars
         self.ui.btnSel_Input_Ch1.setChecked(True)
@@ -815,6 +842,9 @@ class NPGController:
                 lbl.setVisible(False)
                 pb.setVisible(False)
                 cmb.setVisible(False)
+            self.ui.grpDoubleBlink.setVisible(False)
+            self.ui.grpTripleBlink.setVisible(False)
+            self.ui.grpDoubleJawClench.setVisible(False)
 
         # Not connected — hide everything
         if not self.is_connected:
@@ -859,6 +889,11 @@ class NPGController:
             fixed['ecg'][1].setVisible(has_ecg)
             fixed['ecg'][2].setVisible(has_ecg)
 
+            # Detection sub-rows
+            self.ui.grpDoubleBlink.setVisible(has_eeg)
+            self.ui.grpTripleBlink.setVisible(has_eeg)
+            self.ui.grpDoubleJawClench.setVisible(has_jaw)
+
             for i, (lbl, pb, cmb) in enumerate(emg_slots):
                 if i < len(emg_chs):
                     lbl.setText(f' EMG(Ch{emg_chs[i]})')
@@ -872,6 +907,9 @@ class NPGController:
         else:
             # Specific channel — only show if the channel is actually checked
             hide_all()
+            self.ui.grpDoubleBlink.setVisible(False)
+            self.ui.grpTripleBlink.setVisible(False)
+            self.ui.grpDoubleJawClench.setVisible(False)
             ch_idx = sel - 1
             if ch_idx < self.num_channels:
                 cb = getattr(self.ui, f'grpCh{sel}')
@@ -882,11 +920,15 @@ class NPGController:
                             fixed[k][0].setVisible(True)
                             fixed[k][1].setVisible(True)
                             fixed[k][2].setVisible(True)
+                        self.ui.grpDoubleBlink.setVisible(True)
+                        self.ui.grpTripleBlink.setVisible(True)
+                        self.ui.grpDoubleJawClench.setVisible(True)
                     elif ftype == 'eog':
                         for k in ('leftEye', 'rightEye', 'jaw'):
                             fixed[k][0].setVisible(True)
                             fixed[k][1].setVisible(True)
                             fixed[k][2].setVisible(True)
+                        self.ui.grpDoubleJawClench.setVisible(True)
                     elif ftype == 'ecg':
                         fixed['ecg'][0].setVisible(True)
                         fixed['ecg'][1].setVisible(True)
@@ -978,6 +1020,9 @@ class NPGController:
         for i in range(emg_idx, 4):
             emg_bars[i].setValue(0)
 
+        # ── Blink/Jaw detection (multi-event) ─────────────────────────────
+        self._process_blink_jaw_detection()
+
         # ── Detection → key mapping → gamepad ────────────────────────────
         self._process_key_mappings()
 
@@ -1046,6 +1091,9 @@ class NPGController:
             all_keys = ["A", "B", "X", "Y", "Dpad Up", "Dpad Down",
                         "Dpad Left", "Dpad Right", "L", "R", "Start"]
             for key_name in all_keys:
+                # Don't reset keys that are currently mid-flash from detection events
+                if key_name in self._detection_flash_keys:
+                    continue
                 self.test_dialog.viewer.update_button(
                     key_name, key_name in keys_to_press)
 
@@ -1058,11 +1106,113 @@ class NPGController:
 
     # ── Run ──────────────────────────────────────────────────────────────────
 
+    # ── Blink / Jaw multi-event detection ──────────────────────────────────
+
+    def _process_blink_jaw_detection(self):
+        """Feed latest envelope values into BlinkDetector / JawClenchDetector
+        and trigger gamepad actions for double/triple events."""
+        import time
+        now_ms = int(time.time() * 1000)
+
+        # Sync thresholds from UI bars
+        blink_thresh = (self.ui.pbBlink.threshold() / 100.0) * BLINK_SCALE
+        jaw_thresh = (self.ui.pbJaw.threshold() / 100.0) * JAW_SCALE
+        self.blink_detector.threshold = blink_thresh
+        self.jaw_detector.threshold = jaw_thresh
+
+        # Find the first active EEG channel for blink samples
+        blink_sample = None
+        jaw_sample = None
+        for ch in range(self.num_channels):
+            p = self.processors[ch]
+            cb = getattr(self.ui, f'grpCh{ch + 1}')
+            if not cb.isChecked():
+                continue
+            if p.filter_type == 'eeg' and blink_sample is None:
+                blink_sample = p.val_blink_envelope
+                if jaw_sample is None:
+                    jaw_sample = p.val_jaw_envelope
+            elif p.filter_type == 'eog' and jaw_sample is None:
+                jaw_sample = p.val_jaw_envelope
+
+        # Blink detection
+        if blink_sample is not None and self.ui.grpDoubleBlink.isVisible():
+            event = self.blink_detector.process(blink_sample, now_ms)
+            if event == 'double' and self.ui.grpDoubleBlink.isChecked():
+                self._trigger_detection_action(self.ui.cmbDoubleBlink)
+            elif event == 'triple' and self.ui.grpTripleBlink.isChecked():
+                self._trigger_detection_action(self.ui.cmbTripleBlink)
+
+        # Jaw detection
+        if jaw_sample is not None and self.ui.grpDoubleJawClench.isVisible():
+            event = self.jaw_detector.process(jaw_sample, now_ms)
+            if event == 'double' and self.ui.grpDoubleJawClench.isChecked():
+                self._trigger_detection_action(self.ui.cmbDoubleJawClench)
+
+    def _trigger_detection_action(self, cmb):
+        """Press and quickly release a gamepad button for a detection event."""
+        key_name = cmb.currentText()
+        if key_name == 'None':
+            return
+            
+        xusb = SNES_TO_XUSB.get(key_name)
+        
+        if self.gamepad and xusb:
+            if xusb == 'LT':
+                self.gamepad.left_trigger_float(value_float=1.0)
+                self.gamepad.update()
+                QTimer.singleShot(500, lambda: self._release_trigger('LT'))
+            elif xusb == 'RT':
+                self.gamepad.right_trigger_float(value_float=1.0)
+                self.gamepad.update()
+                QTimer.singleShot(500, lambda: self._release_trigger('RT'))
+            else:
+                self.gamepad.press_button(xusb)
+                self.gamepad.update()
+                QTimer.singleShot(500, lambda btn=xusb: self._release_button(btn))
+            print(f"🎮 Pressed '{key_name}'")
+
+        # Lock this key so _process_key_mappings doesn't overwrite it
+        self._detection_flash_keys.add(key_name)
+
+        # Update controller viewer (even if gamepad driver is disconnected)
+        if self.test_dialog:
+            self.test_dialog.viewer.update_button(key_name, True)
+
+        # Release flash lock + viewer after 500ms
+        def _end_flash(k=key_name):
+            self._detection_flash_keys.discard(k)
+            if self.test_dialog:
+                self.test_dialog.viewer.update_button(k, False)
+        QTimer.singleShot(500, _end_flash)
+
+    def _release_trigger(self, which):
+        if not self.gamepad:
+            return
+        if which == 'LT':
+            self.gamepad.left_trigger_float(value_float=0.0)
+        else:
+            self.gamepad.right_trigger_float(value_float=0.0)
+        self.gamepad.update()
+
+    def _release_button(self, xusb):
+        if not self.gamepad:
+            return
+        self.gamepad.release_button(xusb)
+        self.gamepad.update()
+
     def run(self):
         self.ui.show()
         try:
             return self.app.exec()
         finally:
+            if self.gamepad:
+                try:
+                    self.gamepad.reset()
+                    self.gamepad.update()
+                    del self.gamepad
+                except Exception:
+                    pass
             self.ble.shutdown()
 
 
