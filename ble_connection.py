@@ -78,7 +78,7 @@ class NPGConnection:
         Returns:
             List of discovered NPGDevice objects.
         """
-        print(f"Scanning for NPG devices ({timeout}s)...")
+        print(f"Scanning for NPG Lite devices ({timeout}s)...")
 
         discovered = await BleakScanner.discover(timeout=timeout)
         npg_devices = [
@@ -120,7 +120,10 @@ class NPGConnection:
                 f"Cannot determine channel count from device name: {npg_device.name}. "
                 "Expected name containing '3CH' or '6CH'."
             )
-        print(f"{self.num_channels}-channel mode")
+        if self.num_channels == 3:
+            print("Explorer or Ninja Playmate detected (3 channels)")
+        else:
+            print("Beast Playmate detected (6 channels)")
 
     async def disconnect(self) -> None:
         """Stop streaming (if active) and disconnect from the device."""
@@ -242,7 +245,7 @@ async def _cli_main():
 
     # ── Display found devices ───────────────────────────────────────────────
     print(f"\n{'═' * 55}")
-    print(f"  Found {len(devices)} NPG device(s):")
+    print(f"  Found {len(devices)} NPG Lite device(s):")
     print(f"{'═' * 55}")
     for i, dev in enumerate(devices, 1):
         print(f"  [{i}] {dev}")
