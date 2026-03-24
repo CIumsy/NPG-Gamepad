@@ -66,7 +66,7 @@ QCheckBox {
     spacing: 10px;
     font-size: 13px;
     font-weight: 700;
-    padding: 4px 0px;
+    padding: 6px 0px 6px 0px;
     background-color: transparent;
 }
 
@@ -80,14 +80,20 @@ QCheckBox::indicator {
     border-radius: 4px;
     background-color: transparent;
     border: 2px solid #3a3a3a;
+    transition: border 0.2s, background 0.2s;
 }
-
-QCheckBox::indicator:hover {
+QCheckBox::indicator:hover,
+QCheckBox::indicator:focus {
     border: 2px solid #ffffff;
 }
-
 QCheckBox::indicator:checked {
-    background-color: transparent;
+    background-color: #0a0a0a;
+    border: 2px solid #ffffff;
+    image: url(icons/check.svg);
+}
+QCheckBox::indicator:checked:hover,
+QCheckBox::indicator:checked:focus {
+    background-color: #0a0a0a;
     border: 2px solid #ffffff;
     image: url(icons/check.svg);
 }
@@ -293,7 +299,7 @@ QPushButton:checked:disabled {
          <item>
           <widget class="QGroupBox" name="grpCh1">
            <property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet">
-            <string notr="true">QGroupBox#grpCh1{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:14px;padding:6px 8px;}QGroupBox#grpCh1::title{}</string>
+            <string notr="true">QGroupBox#grpCh1{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:22px;margin-bottom:0px;padding:12px 8px 6px 8px;}QGroupBox#grpCh1::title{}</string>
            </property>
            <property name="title">
             <string>Channel 1</string>
@@ -395,7 +401,7 @@ QPushButton:checked:disabled {
          <item>
           <widget class="QGroupBox" name="grpCh2">
            <property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet">
-            <string notr="true">QGroupBox#grpCh2{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:14px;padding:6px 8px;}QGroupBox#grpCh2::title{}</string>
+            <string notr="true">QGroupBox#grpCh2{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:22px;margin-bottom:0px;padding:12px 8px 6px 8px;}QGroupBox#grpCh2::title{}</string>
            </property>
            <property name="title">
             <string>Channel 2</string>
@@ -497,7 +503,7 @@ QPushButton:checked:disabled {
          <item>
           <widget class="QGroupBox" name="grpCh3">
            <property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet">
-            <string notr="true">QGroupBox#grpCh3{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:14px;padding:6px 8px;}QGroupBox#grpCh3::title{}</string>
+            <string notr="true">QGroupBox#grpCh3{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:22px;margin-bottom:0px;padding:12px 8px 6px 8px;}QGroupBox#grpCh3::title{}</string>
            </property>
            <property name="title">
             <string>Channel 3</string>
@@ -599,7 +605,7 @@ QPushButton:checked:disabled {
          <item>
           <widget class="QGroupBox" name="grpCh4">
            <property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet">
-            <string notr="true">QGroupBox#grpCh4{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:14px;padding:6px 8px;}QGroupBox#grpCh4::title{}</string>
+            <string notr="true">QGroupBox#grpCh4{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:22px;margin-bottom:0px;padding:12px 8px 6px 8px;}QGroupBox#grpCh4::title{}</string>
            </property>
            <property name="title">
             <string>Channel 4</string>
@@ -701,7 +707,7 @@ QPushButton:checked:disabled {
          <item>
           <widget class="QGroupBox" name="grpCh5">
            <property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet">
-            <string notr="true">QGroupBox#grpCh5{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:14px;padding:6px 8px;}QGroupBox#grpCh5::title{}</string>
+            <string notr="true">QGroupBox#grpCh5{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:22px;margin-bottom:0px;padding:12px 8px 6px 8px;}QGroupBox#grpCh5::title{}</string>
            </property>
            <property name="title">
             <string>Channel 5</string>
@@ -803,7 +809,7 @@ QPushButton:checked:disabled {
          <item>
           <widget class="QGroupBox" name="grpCh6">
            <property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet">
-            <string notr="true">QGroupBox#grpCh6{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:14px;padding:6px 8px;}QGroupBox#grpCh6::title{}</string>
+            <string notr="true">QGroupBox#grpCh6{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:22px;margin-bottom:0px;padding:12px 8px 6px 8px;}QGroupBox#grpCh6::title{}</string>
            </property>
            <property name="title">
             <string>Channel 6</string>
@@ -924,13 +930,6 @@ QPushButton:checked:disabled {
              <number>8</number>
             </property>
             <item>
-              <widget class="QCheckBox" name="chkNotch">
-               <property name="text">
-                <string />
-               </property>
-              </widget>
-             </item>
-            <item>
              <layout class="QHBoxLayout" name="notchFreqLayout">
               <property name="spacing">
                <number>0</number>
@@ -986,7 +985,7 @@ QPushButton:checked:disabled {
              </spacer>
             </item>
            </layout>
-          </widget>
+          <property name="checkable"><bool>true</bool></property><property name="checked"><bool>false</bool></property></widget>
          </item>
          <item>
           <spacer name="configSpacer">

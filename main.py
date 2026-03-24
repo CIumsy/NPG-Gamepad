@@ -314,6 +314,7 @@ class NPGController:
         self._init_button_groups()
         self._init_threshold_bars()
         self._init_keybindings()
+        self._fix_groupbox_styles()
         self._connect_signals()
         self._set_channel_enabled(0)
         # Uncheck "All" so it doesn't look selected at startup
@@ -431,7 +432,7 @@ class NPGController:
         self.ui.btnKeybinds.clicked.connect(self._on_keybinds_clicked)
 
         # Notch
-        self.ui.chkNotch.stateChanged.connect(self._on_notch_toggle)
+        self.ui.grpNotch.toggled.connect(self._on_notch_toggle)
         self.grp_notch_freq.idClicked.connect(self._on_notch_freq)
 
         # Per-channel filter
@@ -469,7 +470,6 @@ class NPGController:
 
         # Notch section
         self.ui.grpNotch.setEnabled(any_active)
-        self._update_grp_title_style('grpNotch', any_active)
 
         # Input selector buttons
         self.ui.btnSel_Input_All.setEnabled(any_active)
@@ -483,7 +483,6 @@ class NPGController:
 
             # Disable entire group box for out-of-range (greys title too)
             getattr(self.ui, f'grpCh{ch}').setEnabled(in_range)
-            self._update_grp_title_style(f'grpCh{ch}', in_range)
 
             cb = getattr(self.ui, f'grpCh{ch}')
             cb.blockSignals(True)
@@ -506,31 +505,119 @@ class NPGController:
             self.processors[ch_idx].set_filter('emg')
             self.processors[ch_idx].set_notch('off')
 
-    def _update_grp_title_style(self, name, enabled):
-        """Update group box inline stylesheet so the title is white or grey."""
-        grp = getattr(self.ui, name)
-        c = '#ffffff' if enabled else '#333333'
-        # Rebuild inline stylesheet: base box style + title colours
-        base = grp.property('styleSheet') or ''
-        # Strip any previous ::title rule we injected
-        if '::title{' in base:
-            base = base[:base.index('::title{')] 
-            # also strip trailing '}'
-            base = base.rstrip('}')
-        # If base still has the original box style keep it, otherwise start fresh
-        if name.startswith('grpCh'):
-            box_style = (
-                f"QGroupBox#{name}{{background-color:transparent;"
-                f"border:1px solid #2a2a2a;border-radius:8px;"
-                f"margin-top:14px;padding:6px 8px;}}"
-            )
-        else:
-            box_style = ''
-        title_style = (
-            f"QGroupBox#{name}::title{{border:1px solid {c};color:{c};"
-            f"font-size:11px;padding:3px 8px;border-radius:5px;}}"
-        )
-        grp.setStyleSheet(box_style + title_style)
+    def _fix_groupbox_styles(self):
+        """Enforce perfect badge-style titles and checkboxes on the channel groupboxes, 
+        mirroring the Notch filter styles, and fix the clipping top border bug."""
+        
+        for i in range(1, 7):
+            grp = getattr(self.ui, f'grpCh{i}')
+            inline_css = f"""
+            QGroupBox#grpCh{i} {{
+                background-color: transparent;
+                border: 1px solid #ffffff;  /* Box outer line bright white when active */
+                border-radius: 8px;
+                margin-top: 14px;
+                margin-bottom: 6px; /* Stop vertical clipping / overlaps */
+                padding-top: 14px; 
+                padding-bottom: 6px;
+                padding-left: 8px;
+                padding-right: 8px;
+            }}
+            QGroupBox#grpCh{i}:disabled, QGroupBox#grpCh{i}:unchecked {{
+                border: 1px solid #2a2a2a; /* Greyed out box when inactive or unchecked */
+            }}
+            /* The title is styled as a badge */
+            QGroupBox#grpCh{i}::title {{
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                padding: 4px 8px;
+                left: 12px;
+                top: 0px;
+                background-color: #0a0a0a;  /* Hides the top border line natively without Qt clipping bugs */
+                border: 1px solid #ffffff;
+                border-radius: 5px;
+                color: #ffffff;
+                font-size: 11px;
+            }}
+            QGroupBox#grpCh{i}::title:disabled, QGroupBox#grpCh{i}::title:unchecked {{
+                border: 1px solid #333333;
+                color: #333333;
+            }}
+            /* The check box in the title */
+            QGroupBox#grpCh{i}::indicator {{
+                width: 16px; 
+                height: 16px;
+                border-radius: 4px;
+                background-color: transparent;
+                border: 2px solid #3a3a3a;
+                margin-right: 6px;
+                margin-top: 1px;
+            }}
+            QGroupBox#grpCh{i}::indicator:checked {{
+                background-color: #0a0a0a;
+                border: 2px solid #ffffff;
+                image: url(icons/check.svg);
+            }}
+            QGroupBox#grpCh{i}::indicator:disabled, QGroupBox#grpCh{i}::indicator:unchecked {{
+                border: 2px solid #222222;
+                background-color: transparent;
+                image: none;
+            }}
+            """
+            grp.setStyleSheet(inline_css)
+            
+        # Ensure grpNotch safely adopts correct title disabled/enabled pseudo-states
+        notch_css = """
+        QGroupBox#grpNotch {
+            background-color: transparent;
+            border: 1px solid #ffffff;  /* Box outer line bright white when active */
+            border-radius: 8px;
+            margin-top: 14px;
+            margin-bottom: 6px;
+            padding-top: 14px; 
+            padding-bottom: 6px;
+            padding-left: 8px;
+            padding-right: 8px;
+        }
+        QGroupBox#grpNotch:disabled, QGroupBox#grpNotch:unchecked {
+            border: 1px solid #2a2a2a; /* Greyed out box when inactive or unchecked */
+        }
+        QGroupBox#grpNotch::title {
+            background-color: #0a0a0a;
+            border: 1px solid #ffffff;
+            color: #ffffff;
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 5px;
+            subcontrol-origin: margin;
+            subcontrol-position: top left;
+            left: 12px;
+        }
+        QGroupBox#grpNotch::title:disabled, QGroupBox#grpNotch::title:unchecked {
+            border: 1px solid #333333;
+            color: #333333;
+        }
+        QGroupBox#grpNotch::indicator {
+            width: 16px; 
+            height: 16px;
+            border-radius: 4px;
+            background-color: transparent;
+            border: 2px solid #3a3a3a;
+            margin-right: 6px;
+            margin-top: 1px;
+        }
+        QGroupBox#grpNotch::indicator:checked {
+            background-color: #0a0a0a;
+            border: 2px solid #ffffff;
+            image: url(icons/check.svg);
+        }
+        QGroupBox#grpNotch::indicator:disabled, QGroupBox#grpNotch::indicator:unchecked {
+            border: 2px solid #222222;
+            background-color: transparent;
+            image: none;
+        }
+        """
+        self.ui.grpNotch.setStyleSheet(notch_css)
 
     # ── Handlers: Connect / Disconnect ───────────────────────────────────────
 
@@ -650,7 +737,7 @@ class NPGController:
     # ── Handlers: Notch ──────────────────────────────────────────────────────
 
     def _on_notch_toggle(self, state):
-        notch_on = (state != 0)
+        notch_on = bool(state)
         self.ui.btnNotch50Hz.setEnabled(notch_on)
         self.ui.btnNotch60Hz.setEnabled(notch_on)
         self._apply_notch_to_all()
@@ -660,7 +747,7 @@ class NPGController:
 
     def _apply_notch_to_all(self):
         """Apply the global notch setting to all enabled+checked channels."""
-        if self.ui.chkNotch.isChecked():
+        if self.ui.grpNotch.isChecked():
             setting = '50' if self.ui.btnNotch50Hz.isChecked() else '60'
         else:
             setting = 'off'
