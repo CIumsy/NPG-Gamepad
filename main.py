@@ -28,7 +28,7 @@ try:
     HAS_VGAMEPAD = True
 except ImportError:
     HAS_VGAMEPAD = False
-    print("⚠️  vgamepad not installed — virtual gamepad output disabled")
+    print("vgamepad not installed — virtual gamepad output disabled")
 
 # Map SNES key names (from combo boxes) → vgamepad XUSB_BUTTON constants
 SNES_TO_XUSB = {}
@@ -702,10 +702,10 @@ class NPGController:
             for attempt in range(1, 4):
                 try:
                     self.gamepad = vg.VX360Gamepad()
-                    print("🎮 Virtual gamepad created")
+                    print("Virtual gamepad created")
                     break
                 except Exception as e:
-                    print(f"⚠️  Gamepad attempt {attempt}/3 failed: {e}")
+                    print(f"Gamepad attempt {attempt}/3 failed: {e}")
                     self.gamepad = None
                     if attempt < 3:
                         time.sleep(0.5)
@@ -735,7 +735,7 @@ class NPGController:
                 pass
             self.gamepad = None
             self._pressed_buttons.clear()
-            print("🎮 Virtual gamepad released")
+            print("Virtual gamepad released")
 
         # Reset controller viewer
         if self.test_dialog:
@@ -1170,7 +1170,7 @@ class NPGController:
                 self.gamepad.press_button(xusb)
                 self.gamepad.update()
                 QTimer.singleShot(500, lambda btn=xusb: self._release_button(btn))
-            print(f"🎮 Pressed '{key_name}'")
+            print(f"Pressed '{key_name}'")
 
         # Lock this key so _process_key_mappings doesn't overwrite it
         self._detection_flash_keys.add(key_name)

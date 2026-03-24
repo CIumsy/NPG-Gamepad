@@ -78,7 +78,7 @@ class NPGConnection:
         Returns:
             List of discovered NPGDevice objects.
         """
-        print(f"🔍 Scanning for NPG devices ({timeout}s)...")
+        print(f"Scanning for NPG devices ({timeout}s)...")
 
         discovered = await BleakScanner.discover(timeout=timeout)
         npg_devices = [
@@ -87,9 +87,9 @@ class NPGConnection:
         ]
 
         if npg_devices:
-            print(f"✅ Found {len(npg_devices)} NPG device(s)")
+            print(f"Found {len(npg_devices)} NPG device(s)")
         else:
-            print("❌ No NPG devices found")
+            print("No NPG devices found")
 
         return npg_devices
 
@@ -103,7 +103,7 @@ class NPGConnection:
             npg_device: The device to connect to.
         """
         self.device = npg_device
-        print(f"📡 Connecting to {npg_device.name} ({npg_device.address})...")
+        print(f"Connecting to {npg_device.name} ({npg_device.address})...")
 
         self.client = BleakClient(npg_device.address, timeout=20.0)
         await self.client.connect()
@@ -111,7 +111,7 @@ class NPGConnection:
         if not self.client.is_connected:
             raise ConnectionError(f"Failed to connect to {npg_device.name}")
 
-        print(f"✅ Connected to {npg_device.name}")
+        print(f"Connected to {npg_device.name}")
 
         # Channel count is determined from device name
         self.num_channels = npg_device.expected_channels
@@ -120,7 +120,7 @@ class NPGConnection:
                 f"Cannot determine channel count from device name: {npg_device.name}. "
                 "Expected name containing '3CH' or '6CH'."
             )
-        print(f"📊 {self.num_channels}-channel mode")
+        print(f"{self.num_channels}-channel mode")
 
     async def disconnect(self) -> None:
         """Stop streaming (if active) and disconnect from the device."""
@@ -129,7 +129,7 @@ class NPGConnection:
 
         if self.client and self.client.is_connected:
             await self.client.disconnect()
-            print("🔌 Disconnected")
+            print("Disconnected")
 
         self._reset()
 
@@ -178,14 +178,14 @@ class NPGConnection:
         try:
             await self.client.start_notify(BATTERY_CHAR_UUID, self._on_battery_notification)
         except Exception:
-            print("⚠️  Battery characteristic not available on this device")
+            print("Battery characteristic not available on this device")
 
         # Send START command
         await self.client.write_gatt_char(CONTROL_CHAR_UUID, CMD_START)
         self.is_streaming = True
         self.sample_count = 0
 
-        print(f"▶️  Streaming {self.num_channels} channels @ {SAMPLE_RATE} Hz")
+        print(f"Streaming {self.num_channels} channels @ {SAMPLE_RATE} Hz")
 
     async def stop_streaming(self) -> None:
         """Send STOP command and unsubscribe from notifications."""
@@ -209,7 +209,7 @@ class NPGConnection:
             pass
 
         self.is_streaming = False
-        print("⏹️  Streaming stopped")
+        print("Streaming stopped")
 
     # ── Internal BLE notification handlers ─────────────────────────────────────
 
@@ -277,7 +277,7 @@ async def _cli_main():
                 print(f"  [#{sample['counter']:3d}] {ch_vals}")
 
     def on_battery(percentage):
-        print(f"  🔋 Battery: {percentage}%")
+        print(f"Battery: {percentage}%")
 
     connection.on_data(on_data)
     connection.on_battery(on_battery)
@@ -294,7 +294,7 @@ async def _cli_main():
         print("\n")
     finally:
         await connection.disconnect()
-        print(f"\n📊 Total samples: {connection.sample_count}")
+        print(f"\n Total samples: {connection.sample_count}")
 
 
 if __name__ == "__main__":
