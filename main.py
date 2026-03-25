@@ -17,7 +17,20 @@ from PySide6.QtWidgets import (
     QApplication, QInputDialog, QMessageBox, QButtonGroup, QDialog
 )
 from PySide6.QtUiTools import QUiLoader
-from PySide6.QtCore import QObject, Signal, QFile, QTimer
+from PySide6.QtCore import QObject, Signal, QFile, QTimer, qInstallMessageHandler
+
+def qt_message_handler(mode, context, message):
+    # Ignore unfixable SVG and Font warnings from Qt
+    lower_msg = message.lower()
+    if "invalid path data" in lower_msg or "path truncated" in lower_msg:
+        return
+    if "setpointsize: point size <= 0" in lower_msg:
+        return
+    if "unknown property transition" in lower_msg:
+        return
+    sys.stderr.write(f"Qt: {message}\n")
+
+qInstallMessageHandler(qt_message_handler)
 
 from ble_connection import NPGConnection, NPGDevice
 from widgets.ThresholdBar import ThresholdBar
