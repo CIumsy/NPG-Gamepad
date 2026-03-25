@@ -709,16 +709,21 @@ class NPGController:
         # Create virtual gamepad (retry up to 3 times if ViGEmBus is slow)
         if HAS_VGAMEPAD and self.gamepad is None:
             import time
+            import gc
             for attempt in range(1, 4):
                 try:
-                    self.gamepad = vg.VX360Gamepad()
+                    gp = vg.VX360Gamepad()
+                    self.gamepad = gp
                     print("Virtual gamepad created")
                     break
                 except Exception as e:
                     print(f"Gamepad attempt {attempt}/3 failed: {e}")
                     self.gamepad = None
+                    # Force Python to finalize any half-constructed gamepad
+                    # objects so ViGEmBus releases the kernel slot
+                    gc.collect()
                     if attempt < 3:
-                        time.sleep(0.5)
+                        time.sleep(1.0)
 
         # Select Ch1 in input selector and show its bars
         self.ui.btnSel_Input_Ch1.setChecked(True)
@@ -736,16 +741,7 @@ class NPGController:
         self._reset_progress_bars()
 
         # Release all gamepad buttons and destroy
-        if self.gamepad:
-            try:
-                self.gamepad.reset()
-                self.gamepad.update()
-                del self.gamepad
-            except Exception:
-                pass
-            self.gamepad = None
-            self._pressed_buttons.clear()
-            print("Virtual gamepad released")
+        self._destroy_gamepad()
 
         # Reset controller viewer
         if self.test_dialog:
@@ -1224,18 +1220,32 @@ class NPGController:
         self.gamepad.release_button(xusb)
         self.gamepad.update()
 
+    def _destroy_gamepad(self):
+        """Safely tear down the virtual gamepad and free the ViGEmBus slot."""
+        if self.gamepad is not None:
+            import gc
+            try:
+                self.gamepad.reset()
+                self.gamepad.update()
+            except Exception:
+                pass
+            try:
+                del self.gamepad
+            except Exception:
+                pass
+            self.gamepad = None
+            self._pressed_buttons.clear()
+            gc.collect()          # force ViGEmBus kernel slot release
+            print("Virtual gamepad released")
+
     def run(self):
+        import atexit
+        atexit.register(self._destroy_gamepad)
         self.ui.show()
         try:
             return self.app.exec()
         finally:
-            if self.gamepad:
-                try:
-                    self.gamepad.reset()
-                    self.gamepad.update()
-                    del self.gamepad
-                except Exception:
-                    pass
+            self._destroy_gamepad()
             self.ble.shutdown()
 
 
