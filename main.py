@@ -953,11 +953,19 @@ class NPGController:
                         fixed['ecg'][1].setVisible(True)
                         fixed['ecg'][2].setVisible(True)
                     elif ftype == 'emg':
-                        lbl, pb, cmb = emg_slots[0]
-                        lbl.setText(f' EMG(Ch{sel})')
-                        lbl.setVisible(True)
-                        pb.setVisible(True)
-                        cmb.setVisible(True)
+                        # Find which sequential EMG bar index this channel
+                        # maps to (must match _update_progress_bars order)
+                        emg_bar_idx = 0
+                        for prev_ch in range(ch_idx):
+                            prev_cb = getattr(self.ui, f'grpCh{prev_ch + 1}')
+                            if prev_cb.isChecked() and self.processors[prev_ch].filter_type == 'emg':
+                                emg_bar_idx += 1
+                        if emg_bar_idx < len(emg_slots):
+                            lbl, pb, cmb = emg_slots[emg_bar_idx]
+                            lbl.setText(f' EMG(Ch{sel})')
+                            lbl.setVisible(True)
+                            pb.setVisible(True)
+                            cmb.setVisible(True)
 
     # ── Data Processing ──────────────────────────────────────────────────────
 
