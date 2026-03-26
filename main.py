@@ -343,6 +343,9 @@ class NPGController:
         self._set_channel_enabled(0)
         # Uncheck "All" so it doesn't look selected at startup
         self.ui.btnSel_Input_All.setChecked(False)
+        # EMG combination dynamic rows: list of (lbl, bar, cmb, ch_a, ch_b)
+        self._emg_combo_rows = []
+
         # Hide detection sub-rows initially
         self.ui.grpDoubleBlink.setVisible(False)
         self.ui.grpTripleBlink.setVisible(False)
@@ -368,6 +371,8 @@ class NPGController:
             'pbEMG2':     40,
             'pbEMG3':     40,
             'pbEMG4':     40,
+            'pbEMG5':     40,
+            'pbEMG6':     40,
         }
         for name, thresh in defaults.items():
             old_pb = getattr(self.ui, name, None)
@@ -415,7 +420,8 @@ class NPGController:
         cmb_list = [
             self.ui.cmbFocus, self.ui.cmbBlink, self.ui.cmbLeftEye, 
             self.ui.cmbRightEye, self.ui.cmbJaw, self.ui.cmbECG,
-            self.ui.cmbEMG1, self.ui.cmbEMG2, self.ui.cmbEMG3, self.ui.cmbEMG4,
+            self.ui.cmbEMG1, self.ui.cmbEMG2, self.ui.cmbEMG3,
+            self.ui.cmbEMG4, self.ui.cmbEMG5, self.ui.cmbEMG6,
             self.ui.cmbDoubleBlink, self.ui.cmbTripleBlink,
             self.ui.cmbDoubleJawClench,
         ]
@@ -728,6 +734,7 @@ class NPGController:
         # Select Ch1 in input selector and show its bars
         self.ui.btnSel_Input_Ch1.setChecked(True)
         self.selected_input = 1
+        self._rebuild_emg_combo_rows()
         self._update_input_visibility()
 
     def _on_disconnected(self):
@@ -793,6 +800,7 @@ class NPGController:
 
     def _on_filter_ch(self, ch, id_):
         self.processors[ch].set_filter(FILTER_MAP.get(id_, 'emg'))
+        self._rebuild_emg_combo_rows()
         self._update_input_visibility()
 
     def _on_channel_toggled(self, ch_idx, state):
@@ -802,7 +810,102 @@ class NPGController:
             self._apply_notch_to_all()
             filter_id = self.grp_filter_ch[ch_idx].checkedId()
             self.processors[ch_idx].set_filter(FILTER_MAP.get(filter_id, 'emg'))
+        self._rebuild_emg_combo_rows()
         self._update_input_visibility()
+
+    def _rebuild_emg_combo_rows(self):
+        """Destroy old combo rows and create new ones for every pair of active
+        EMG channels.  Each row is (QLabel, ThresholdBar, QComboBox, ch_a, ch_b)."""
+        from PySide6.QtWidgets import QLabel, QComboBox, QHBoxLayout
+        from itertools import combinations
+
+        # Find the vertical layout that holds all signal input rows
+        parent_layout = self._find_layout_of_spacer('inputsSpacer')
+        if parent_layout is None:
+            return
+
+        # Remove old rows (widgets + their parent sub-layouts)
+        if self._emg_combo_rows:
+            for lbl, bar, cmb, _, _ in self._emg_combo_rows:
+                # Find and remove the sub-layout from parent
+                for i in range(parent_layout.count() - 1, -1, -1):
+                    item = parent_layout.itemAt(i)
+                    sub = item.layout() if item else None
+                    if sub:
+                        # Check if this sub-layout contains our widget
+                        for j in range(sub.count()):
+                            w = sub.itemAt(j).widget() if sub.itemAt(j) else None
+                            if w is lbl:
+                                parent_layout.takeAt(i)
+                                break
+                lbl.setParent(None)
+                lbl.deleteLater()
+                bar.setParent(None)
+                bar.deleteLater()
+                cmb.setParent(None)
+                cmb.deleteLater()
+            self._emg_combo_rows.clear()
+
+        # Collect active EMG channel numbers (1-based)
+        active_emg = []
+        for ch in range(self.num_channels):
+            cb = getattr(self.ui, f'grpCh{ch + 1}')
+            if cb.isChecked() and self.processors[ch].filter_type == 'emg':
+                active_emg.append(ch + 1)
+
+        if len(active_emg) < 2:
+            return
+
+        snes_keys = [
+            "None", "A", "B", "X", "Y", "Dpad Up", "Dpad Down",
+            "Dpad Left", "Dpad Right", "L", "R", "Start"
+        ]
+
+        # Find the index of the spacer in the parent layout
+        # (It should be the last item, or the first spacer we hit)
+        spacer_idx = None
+        for i in range(parent_layout.count()):
+            item = parent_layout.itemAt(i)
+            if item.spacerItem():
+                spacer_idx = i
+                break
+
+        if spacer_idx is None:
+            spacer_idx = parent_layout.count()
+
+        insert_at = spacer_idx
+
+        for ch_a, ch_b in combinations(active_emg, 2):
+            row_layout = QHBoxLayout()
+            row_layout.setSpacing(12)
+
+            lbl = QLabel(f' EMG(Ch{ch_a}+Ch{ch_b})')
+            lbl.setMinimumWidth(100)
+            lbl.setStyleSheet('background-color: transparent;')
+
+            bar = ThresholdBar(threshold=40)
+            bar.setObjectName(f'pbEMGCombo_{ch_a}_{ch_b}')
+
+            cmb = QComboBox()
+            cmb.setMinimumWidth(80)
+            cmb.addItems(snes_keys)
+
+            row_layout.addWidget(lbl)
+            row_layout.addWidget(bar)
+            row_layout.addWidget(cmb)
+
+            parent_layout.insertLayout(insert_at, row_layout)
+            insert_at += 1
+
+            self._emg_combo_rows.append((lbl, bar, cmb, ch_a, ch_b))
+
+    def _find_layout_of_spacer(self, spacer_name):
+        """Find the parent vertical QLayout that contains all signal input rows.
+        We locate it via pbEMG6's parent widget (which is the QGroupBox for inputs)."""
+        parent_widget = self.ui.pbEMG6.parentWidget()
+        if parent_widget and parent_widget.layout():
+            return parent_widget.layout()
+        return None
 
     # ── Signal Input Selector ────────────────────────────────────────────────
 
@@ -836,6 +939,8 @@ class NPGController:
             (self.ui.lblEMG2, self.ui.pbEMG2, self.ui.cmbEMG2),
             (self.ui.lblEMG3, self.ui.pbEMG3, self.ui.cmbEMG3),
             (self.ui.lblEMG4, self.ui.pbEMG4, self.ui.cmbEMG4),
+            (self.ui.lblEMG5, self.ui.pbEMG5, self.ui.cmbEMG5),
+            (self.ui.lblEMG6, self.ui.pbEMG6, self.ui.cmbEMG6),
         ]
 
         # Helper: hide everything
@@ -847,6 +952,10 @@ class NPGController:
             for lbl, pb, cmb in emg_slots:
                 lbl.setVisible(False)
                 pb.setVisible(False)
+                cmb.setVisible(False)
+            for lbl, bar, cmb, _, _ in self._emg_combo_rows:
+                lbl.setVisible(False)
+                bar.setVisible(False)
                 cmb.setVisible(False)
             self.ui.grpDoubleBlink.setVisible(False)
             self.ui.cmbDoubleBlink.setVisible(False)
@@ -916,6 +1025,13 @@ class NPGController:
                     lbl.setVisible(False)
                     pb.setVisible(False)
                     cmb.setVisible(False)
+
+            # Show relevant EMG combination rows
+            for lbl, bar, cmb, ch_a, ch_b in self._emg_combo_rows:
+                vis = (ch_a in emg_chs) and (ch_b in emg_chs)
+                lbl.setVisible(vis)
+                bar.setVisible(vis)
+                cmb.setVisible(vis)
         else:
             # Specific channel — only show if the channel is actually checked
             hide_all()
@@ -966,6 +1082,12 @@ class NPGController:
                             lbl.setVisible(True)
                             pb.setVisible(True)
                             cmb.setVisible(True)
+                        # Show combo rows involving this channel
+                        for lbl2, bar2, cmb2, ch_a, ch_b in self._emg_combo_rows:
+                            if sel == ch_a or sel == ch_b:
+                                lbl2.setVisible(True)
+                                bar2.setVisible(True)
+                                cmb2.setVisible(True)
 
     # ── Data Processing ──────────────────────────────────────────────────────
 
@@ -987,8 +1109,11 @@ class NPGController:
 
         focus_set = blink_set = jaw_set = ecg_set = False
         left_eye_set = right_eye_set = False
-        emg_bars = [self.ui.pbEMG1, self.ui.pbEMG2, self.ui.pbEMG3, self.ui.pbEMG4]
+        emg_bars = [self.ui.pbEMG1, self.ui.pbEMG2, self.ui.pbEMG3,
+                    self.ui.pbEMG4, self.ui.pbEMG5, self.ui.pbEMG6]
         emg_idx = 0
+        # Track per-channel EMG envelope values for combo rows
+        emg_ch_envelopes = {}
 
         # Determine which channel owns jaw clench (lowest EEG or EOG)
         jaw_owner = None
@@ -1030,9 +1155,10 @@ class NPGController:
                     jaw_set = True
 
             elif p.filter_type == 'emg':
-                if emg_idx < 4:
+                if emg_idx < 6:
                     emg_bars[emg_idx].setValue(clamp100(p.val_emg_envelope, EMG_SCALE))
                     emg_idx += 1
+                emg_ch_envelopes[ch + 1] = p.val_emg_envelope
 
             elif p.filter_type == 'ecg' and not ecg_set:
                 self.ui.pbECG.setValue(clamp100(p.val_ecg, ECG_SCALE))
@@ -1044,8 +1170,17 @@ class NPGController:
         if not right_eye_set: self.ui.pbRightEye.setValue(0)
         if not jaw_set:       self.ui.pbJaw.setValue(0)
         if not ecg_set:       self.ui.pbECG.setValue(0)
-        for i in range(emg_idx, 4):
+        for i in range(emg_idx, 6):
             emg_bars[i].setValue(0)
+
+        # ── EMG combination rows update ───────────────────────────────
+        for lbl, bar, cmb, ch_a, ch_b in self._emg_combo_rows:
+            if not bar.isVisible():
+                continue
+            val_a = emg_ch_envelopes.get(ch_a, 0.0)
+            val_b = emg_ch_envelopes.get(ch_b, 0.0)
+            combined = val_a + val_b
+            bar.setValue(clamp100(combined, EMG_SCALE * 2))
 
         # ── Blink/Jaw detection (multi-event) ─────────────────────────────
         self._process_blink_jaw_detection()
@@ -1068,7 +1203,12 @@ class NPGController:
             (self.ui.pbEMG2,     self.ui.cmbEMG2),
             (self.ui.pbEMG3,     self.ui.cmbEMG3),
             (self.ui.pbEMG4,     self.ui.cmbEMG4),
+            (self.ui.pbEMG5,     self.ui.cmbEMG5),
+            (self.ui.pbEMG6,     self.ui.cmbEMG6),
         ]
+        # Add EMG combination rows
+        for lbl, bar, cmb, _, _ in self._emg_combo_rows:
+            bar_cmb_pairs.append((bar, cmb))
 
         # Collect which SNES keys should be pressed this frame
         keys_to_press = set()
@@ -1128,7 +1268,10 @@ class NPGController:
         for bar in [self.ui.pbFocus, self.ui.pbBlink,
                     self.ui.pbLeftEye, self.ui.pbRightEye,
                     self.ui.pbJaw, self.ui.pbECG,
-                    self.ui.pbEMG1, self.ui.pbEMG2, self.ui.pbEMG3, self.ui.pbEMG4]:
+                    self.ui.pbEMG1, self.ui.pbEMG2, self.ui.pbEMG3,
+                    self.ui.pbEMG4, self.ui.pbEMG5, self.ui.pbEMG6]:
+            bar.setValue(0)
+        for _, bar, _, _, _ in self._emg_combo_rows:
             bar.setValue(0)
 
     # ── Run ──────────────────────────────────────────────────────────────────
