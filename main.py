@@ -528,6 +528,8 @@ class NPGController:
 
             self._set_channel_controls_enabled(ch_idx, checked)
 
+        self._update_filter_button_states()
+
     def _set_channel_controls_enabled(self, ch_idx, enabled):
         """Enable/disable filter buttons + icon for one channel. Reset on disable."""
         ch = ch_idx + 1
@@ -800,6 +802,7 @@ class NPGController:
 
     def _on_filter_ch(self, ch, id_):
         self.processors[ch].set_filter(FILTER_MAP.get(id_, 'emg'))
+        self._update_filter_button_states()
         self._rebuild_emg_combo_rows()
         self._update_input_visibility()
 
@@ -810,8 +813,40 @@ class NPGController:
             self._apply_notch_to_all()
             filter_id = self.grp_filter_ch[ch_idx].checkedId()
             self.processors[ch_idx].set_filter(FILTER_MAP.get(filter_id, 'emg'))
+        self._update_filter_button_states()
         self._rebuild_emg_combo_rows()
         self._update_input_visibility()
+
+    def _update_filter_button_states(self):
+        """Ensure EEG, EOG, and ECG can only be selected by one active channel at a time."""
+        active_filters = {}  # map filter_id(1=EEG, 2=EOG, 3=ECG) -> ch_idx
+        
+        # 1. Identify claiming channels
+        for ch_idx in range(MAX_CHANNELS):
+            cb = getattr(self.ui, f'grpCh{ch_idx + 1}')
+            if cb.isChecked():
+                filter_id = self.grp_filter_ch[ch_idx].checkedId()
+                if filter_id in (1, 2, 3):
+                    if filter_id in active_filters:
+                        # Conflict! Revert this channel to EMG
+                        getattr(self.ui, f'btnFilterCh{ch_idx + 1}EMG').setChecked(True)
+                        self.processors[ch_idx].set_filter('emg')
+                    else:
+                        active_filters[filter_id] = ch_idx
+        
+        # 2. Disable buttons for claimed filters on other enabled channels
+        for ch_idx in range(MAX_CHANNELS):
+            cb = getattr(self.ui, f'grpCh{ch_idx + 1}')
+            if not cb.isEnabled() or not cb.isChecked():
+                continue
+                
+            btn_eeg = getattr(self.ui, f'btnFilterCh{ch_idx + 1}EEG')
+            btn_eog = getattr(self.ui, f'btnFilterCh{ch_idx + 1}EOG')
+            btn_ecg = getattr(self.ui, f'btnFilterCh{ch_idx + 1}ECG')
+            
+            btn_eeg.setEnabled(1 not in active_filters or active_filters[1] == ch_idx)
+            btn_eog.setEnabled(2 not in active_filters or active_filters[2] == ch_idx)
+            btn_ecg.setEnabled(3 not in active_filters or active_filters[3] == ch_idx)
 
     def _rebuild_emg_combo_rows(self):
         """Destroy old combo rows and create new ones for every pair of active
