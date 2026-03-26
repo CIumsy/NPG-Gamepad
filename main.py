@@ -76,7 +76,7 @@ MAX_CHANNELS = 6
 FILTER_MAP = {0: 'emg', 1: 'eeg', 2: 'eog', 3: 'ecg'}
 
 # Progress bar scaling (raw → 0-100)
-EMG_SCALE = 500.0
+EMG_SCALE = 1000.0
 BLINK_SCALE = 300.0
 EYE_SCALE = 300.0
 JAW_SCALE = 500.0
