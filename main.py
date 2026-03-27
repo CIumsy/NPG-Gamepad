@@ -1,11 +1,23 @@
 """
-NPG Gamepad Emulator — Main Application
-========================================
-Loads NPG-Controller.ui, connects to NPG Lite via BLE,
-processes signals through configurable filter chains,
-and displays live signal inputs on progress bars.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Usage:  python main.py
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+Copyright (c) 2026 Krishnanshu Mittal - krishnanshu@upsidedownlabs.tech
+Copyright (c) 2026 Upside Down Labs - contact@upsidedownlabs.tech
+
+At Upside Down Labs, we create open-source DIY neuroscience hardware and software.
+Our mission is to make neuroscience affordable and accessible for everyone.
+By supporting us with your purchase, you help spread innovation and open science.
+Thank you for being part of this journey with us!
 """
 
 import sys
@@ -32,7 +44,7 @@ def qt_message_handler(mode, context, message):
 
 qInstallMessageHandler(qt_message_handler)
 
-from ble_connection import NPGConnection, NPGDevice
+from ble_connection import NPGConnection
 from widgets.ThresholdBar import ThresholdBar
 from widgets.ControllerViewer import ControllerViewer
 
@@ -87,9 +99,7 @@ def clamp100(val, scale):
     return max(0, min(100, int(val / scale * 100)))
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # BLE Manager — async BLE in a background thread, Qt signals for communication
-# ═══════════════════════════════════════════════════════════════════════════════
 
 class BLEManager(QObject):
     scan_result         = Signal(list)
@@ -159,9 +169,7 @@ class BLEManager(QObject):
             self.error.emit(f"Disconnect error: {e}")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # Channel Processor — per-channel notch + signal filter chain
-# ═══════════════════════════════════════════════════════════════════════════════
 
 class ChannelProcessor:
     def __init__(self):
@@ -169,7 +177,7 @@ class ChannelProcessor:
         self.filter_type = 'emg'
         self._init_emg()
 
-    # ── Pipeline initialisers ────────────────────────────────────────────
+    # Pipeline initialisers 
 
     def _init_emg(self):
         self.hp70 = HP70()
@@ -199,7 +207,7 @@ class ChannelProcessor:
         self.ecg_filter = BPECG()
         self.val_ecg = 0.0
 
-    # ── Configuration ────────────────────────────────────────────────────
+    # Configuration 
 
     def set_notch(self, setting):
         if setting == '50':   self.notch = BS50()
@@ -213,7 +221,7 @@ class ChannelProcessor:
         elif ftype == 'eog': self._init_eog()
         elif ftype == 'ecg': self._init_ecg()
 
-    # ── Per-sample processing ────────────────────────────────────────────
+    # Per-sample processing 
 
     def process(self, raw):
         v = float(raw)
@@ -245,9 +253,7 @@ class ChannelProcessor:
             self.val_ecg = abs(f)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # Controller Test Dialog
-# ═══════════════════════════════════════════════════════════════════════════════
 
 class ControllerTestDialog:
     def __init__(self, parent=None):
@@ -285,9 +291,7 @@ class ControllerTestDialog:
         self.viewer.update_button(action_name, value)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # Main Controller — rewritten for the new UI layout
-# ═══════════════════════════════════════════════════════════════════════════════
 
 class NPGController:
     def __init__(self):
@@ -352,7 +356,7 @@ class NPGController:
         self.ui.grpDoubleJawClench.setVisible(False)
         self._update_input_visibility()
 
-    # ── Threshold Bars ────────────────────────────────────────────────────────
+    # Threshold Bars 
 
     def _init_threshold_bars(self):
         """Replace QProgressBars with ThresholdBars (draggable threshold + green detect)."""
@@ -429,7 +433,7 @@ class NPGController:
         for cmb in cmb_list:
             cmb.addItems(snes_keys)
 
-    # ── Button Groups ────────────────────────────────────────────────────────
+    # Button Groups 
 
     def _init_button_groups(self):
         # (Notch on/off is now a QCheckBox — no button group needed)
@@ -460,7 +464,7 @@ class NPGController:
                 getattr(self.ui, f'btnSel_Input_Ch{ch}'), ch
             )
 
-    # ── Signal Wiring ────────────────────────────────────────────────────────
+    # Signal Wiring 
 
     def _connect_signals(self):
         # Bottom bar
@@ -498,7 +502,7 @@ class NPGController:
         self.ble.battery_updated.connect(self._on_battery)
         self.ble.error.connect(self._on_error)
 
-    # ── Channel Enable / Disable ─────────────────────────────────────────────
+    # Channel Enable / Disable 
 
     def _set_channel_enabled(self, n):
         """Enable channels 1..n, disable n+1..6. All remain visible."""
@@ -659,7 +663,7 @@ class NPGController:
 
         self.ui.grpNotch.setStyleSheet(_badge_css('grpNotch'))
 
-    # ── Handlers: Connect / Disconnect ───────────────────────────────────────
+    # Handlers: Connect / Disconnect 
 
     def _on_connect_clicked(self):
         if self.ui.btnConnect.isChecked():
@@ -776,7 +780,7 @@ class NPGController:
             self.test_dialog = ControllerTestDialog(self.ui)
         self.test_dialog.show()
 
-    # ── Handlers: Notch ──────────────────────────────────────────────────────
+    # Handlers: Notch 
 
     def _on_notch_toggle(self, state):
         notch_on = bool(state)
@@ -798,7 +802,7 @@ class NPGController:
             if cb.isChecked():
                 self.processors[ch_idx].set_notch(setting)
 
-    # ── Handlers: Filter & Channel ───────────────────────────────────────────
+    # Handlers: Filter & Channel 
 
     def _on_filter_ch(self, ch, id_):
         self.processors[ch].set_filter(FILTER_MAP.get(id_, 'emg'))
@@ -942,7 +946,7 @@ class NPGController:
             return parent_widget.layout()
         return None
 
-    # ── Signal Input Selector ────────────────────────────────────────────────
+    # Signal Input Selector 
 
     def _on_input_selection(self, id_):
         self.selected_input = id_
@@ -1124,7 +1128,7 @@ class NPGController:
                                 bar2.setVisible(True)
                                 cmb2.setVisible(True)
 
-    # ── Data Processing ──────────────────────────────────────────────────────
+    # Data Processing 
 
     def _on_data(self, samples, num_channels):
         if not self.is_connected:
@@ -1208,7 +1212,7 @@ class NPGController:
         for i in range(emg_idx, 6):
             emg_bars[i].setValue(0)
 
-        # ── EMG combination rows update ───────────────────────────────
+        # EMG combination rows update 
         for lbl, bar, cmb, ch_a, ch_b in self._emg_combo_rows:
             if not bar.isVisible():
                 continue
@@ -1217,10 +1221,10 @@ class NPGController:
             combined = val_a + val_b
             bar.setValue(clamp100(combined, EMG_SCALE * 2))
 
-        # ── Blink/Jaw detection (multi-event) ─────────────────────────────
+        # Blink/Jaw detection (multi-event) 
         self._process_blink_jaw_detection()
 
-        # ── Detection → key mapping → gamepad ────────────────────────────
+        # Detection → key mapping → gamepad 
         self._process_key_mappings()
 
     def _process_key_mappings(self):
@@ -1309,9 +1313,9 @@ class NPGController:
         for _, bar, _, _, _ in self._emg_combo_rows:
             bar.setValue(0)
 
-    # ── Run ──────────────────────────────────────────────────────────────────
+    # Run 
 
-    # ── Blink / Jaw multi-event detection ──────────────────────────────────
+    # Blink / Jaw multi-event detection 
 
     def _process_blink_jaw_detection(self):
         """Feed latest envelope values into BlinkDetector / JawClenchDetector
@@ -1435,7 +1439,6 @@ class NPGController:
             self.ble.shutdown()
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     controller = NPGController()

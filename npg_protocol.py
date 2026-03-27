@@ -16,19 +16,19 @@ Device Naming:
     - 6-channel: "NPG-Lite-6CH:XX:XX"
 """
 
-# ── BLE UUIDs ──────────────────────────────────────────────────────────────────
+# BLE UUIDs 
 SERVICE_UUID     = "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 DATA_CHAR_UUID   = "beb5483e-36e1-4688-b7f5-ea07361b26a8"     # Notify: ADC data
 CONTROL_CHAR_UUID = "0000ff01-0000-1000-8000-00805f9b34fb"     # Read/Write/Notify: commands
 BATTERY_CHAR_UUID = "f633d0ec-46b4-43c1-a39f-1ca06d0602e1"    # Notify: battery %
 
-# ── Commands ───────────────────────────────────────────────────────────────────
+# Commands 
 CMD_START  = b"START"
 CMD_STOP   = b"STOP"
 CMD_WHORU  = b"WHORU"
 CMD_STATUS = b"STATUS"
 
-# ── Data Format Constants ──────────────────────────────────────────────────────
+# Data Format Constants 
 BLOCK_COUNT = 10      # Samples per BLE notification
 SAMPLE_RATE = 500     # Hz per channel
 ADC_RESOLUTION = 4096 # 12-bit ADC (0–4095)

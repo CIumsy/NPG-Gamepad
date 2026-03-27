@@ -65,7 +65,7 @@ class NPGConnection:
         self._data_callback = None
         self._battery_callback = None
 
-    # ── Scanning ───────────────────────────────────────────────────────────────
+    # Scanning 
 
     @staticmethod
     async def scan(timeout: float = 10.0) -> list[NPGDevice]:
@@ -93,7 +93,7 @@ class NPGConnection:
 
         return npg_devices
 
-    # ── Connection ─────────────────────────────────────────────────────────────
+    # Connection 
 
     async def connect(self, npg_device: NPGDevice) -> None:
         """
@@ -144,7 +144,7 @@ class NPGConnection:
         self.is_streaming = False
         self.sample_count = 0
 
-    # ── Callbacks ──────────────────────────────────────────────────────────────
+    # Callbacks 
 
     def on_data(self, callback) -> None:
         """
@@ -163,7 +163,7 @@ class NPGConnection:
         """
         self._battery_callback = callback
 
-    # ── Streaming ──────────────────────────────────────────────────────────────
+    # Streaming 
 
     async def start_streaming(self) -> None:
         """
@@ -214,7 +214,7 @@ class NPGConnection:
         self.is_streaming = False
         print("Streaming stopped")
 
-    # ── Internal BLE notification handlers ─────────────────────────────────────
+    # Internal BLE notification handlers 
 
     def _on_data_notification(self, _sender, data: bytearray) -> None:
         """Handle incoming data notifications from DATA_CHAR_UUID."""
@@ -230,20 +230,20 @@ class NPGConnection:
             self._battery_callback(data[0])
 
 
-# ── Standalone CLI for testing ─────────────────────────────────────────────────
+# Standalone CLI for testing 
 
 async def _cli_main():
     """Interactive CLI: scan → select device → stream data."""
     connection = NPGConnection()
 
-    # ── Scan ────────────────────────────────────────────────────────────────
+    # Scan 
     devices = await connection.scan(timeout=10.0)
 
     if not devices:
         print("\nMake sure your NPG Lite is powered on and not connected to another app.")
         return
 
-    # ── Display found devices ───────────────────────────────────────────────
+    # Display found devices 
     print(f"\n{'═' * 55}")
     print(f"  Found {len(devices)} NPG Lite device(s):")
     print(f"{'═' * 55}")
@@ -251,7 +251,7 @@ async def _cli_main():
         print(f"  [{i}] {dev}")
     print(f"{'═' * 55}")
 
-    # ── Select device ───────────────────────────────────────────────────────
+    # Select device 
     if len(devices) == 1:
         selected = devices[0]
         print(f"\n→ Auto-selecting: {selected}")
@@ -266,10 +266,10 @@ async def _cli_main():
             except ValueError:
                 print("  Enter a valid number")
 
-    # ── Connect ─────────────────────────────────────────────────────────────
+    # Connect 
     await connection.connect(selected)
 
-    # ── Register callbacks ──────────────────────────────────────────────────
+    # Register callbacks 
     def on_data(samples, num_channels):
         for sample in samples:
             # Print every 50th sample (counter 0, 50, 100, ...) to avoid flooding
@@ -285,7 +285,7 @@ async def _cli_main():
     connection.on_data(on_data)
     connection.on_battery(on_battery)
 
-    # ── Stream ──────────────────────────────────────────────────────────────
+    # Stream 
     await connection.start_streaming()
     print(f"\n  Press Ctrl+C to stop\n{'─' * 55}")
 
