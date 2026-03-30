@@ -25,6 +25,33 @@ import os
 import asyncio
 import threading
 
+def resource_path(relative_path):
+    """Get path to bundled resource. Works in both dev and PyInstaller exe."""
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), relative_path)
+
+def ensure_vigembus():
+    """Install ViGEmBus driver if not already installed."""
+    import subprocess
+    result = subprocess.run(['sc', 'query', 'ViGEmBus'], capture_output=True)
+    if result.returncode == 0:
+        return True
+    installer = resource_path('ViGEmBus_1.22.0_x64_x86_arm64.exe')
+    if not os.path.exists(installer):
+        print('ViGEmBus installer not found')
+        return False
+    print('Installing ViGEmBus driver (admin required)...')
+    try:
+        import ctypes, time
+        ctypes.windll.shell32.ShellExecuteW(None, "runas", installer, "/quiet /norestart", None, 1)
+        time.sleep(5)
+        print('ViGEmBus installed successfully')
+        return True
+    except Exception as e:
+        print(f'ViGEmBus install failed: {e}')
+        return False
+
 from PySide6.QtWidgets import (
     QApplication, QInputDialog, QMessageBox, QButtonGroup, QDialog
 )
@@ -48,12 +75,13 @@ from ble_connection import NPGConnection
 from widgets.ThresholdBar import ThresholdBar
 from widgets.ControllerViewer import ControllerViewer
 
+ensure_vigembus()
 try:
     import vgamepad as vg
     HAS_VGAMEPAD = True
-except ImportError:
+except Exception:
     HAS_VGAMEPAD = False
-    print("vgamepad not installed — virtual gamepad output disabled")
+    print("vgamepad not available — virtual gamepad disabled")
 
 # Map SNES key names (from combo boxes) → vgamepad XUSB_BUTTON constants
 SNES_TO_XUSB = {}
@@ -298,9 +326,8 @@ class NPGController:
         self.app = QApplication(sys.argv)
 
         # Load UI
-        script_dir = os.path.dirname(os.path.abspath(__file__))
         loader = QUiLoader()
-        ui_file = QFile(os.path.join(script_dir, "NPG-Controller.ui"))
+        ui_file = QFile(resource_path("NPG-Controller.ui"))
         ui_file.open(QFile.ReadOnly)
         self.ui = loader.load(ui_file)
         ui_file.close()
@@ -360,10 +387,6 @@ class NPGController:
 
     def _init_threshold_bars(self):
         """Replace QProgressBars with ThresholdBars (draggable threshold + green detect)."""
-        # Defaults derived from Arduino algo code:
-        #   Blink   = 50 / BLINK_SCALE(300) * 100 ≈ 17
-        #   Jaw     = 160 / JAW_SCALE(500) * 100  ≈ 32
-        #   Eye L/R = 150 / EYE_SCALE(300) * 100  ≈ 50
         defaults = {
             'pbFocus':    50,
             'pbBlink':    17,
@@ -436,7 +459,6 @@ class NPGController:
     # Button Groups 
 
     def _init_button_groups(self):
-        # (Notch on/off is now a QCheckBox — no button group needed)
 
         # Notch frequency
         self.grp_notch_freq = QButtonGroup(self.ui)
@@ -479,7 +501,7 @@ class NPGController:
         for i, g in enumerate(self.grp_filter_ch):
             g.idClicked.connect(lambda id_, ch=i: self._on_filter_ch(ch, id_))
 
-        # Per-channel checkbox (now QGroupBox)
+        # Per-channel checkbox 
         for i in range(MAX_CHANNELS):
             getattr(self.ui, f'grpCh{i + 1}').toggled.connect(
                 lambda state, ch=i: self._on_channel_toggled(ch, state)
@@ -521,7 +543,7 @@ class NPGController:
             in_range = ch <= n
             checked = (ch == 1) and in_range  # Only ch1 on by default
 
-            # Disable entire group box for out-of-range (greys title too)
+            # Disable entire group box for out-of-range 
             getattr(self.ui, f'grpCh{ch}').setEnabled(in_range)
 
             cb = getattr(self.ui, f'grpCh{ch}')
@@ -720,6 +742,7 @@ class NPGController:
 
         # Create virtual gamepad (retry up to 3 times if ViGEmBus is slow)
         if HAS_VGAMEPAD and self.gamepad is None:
+            ensure_vigembus()   # check and install ViGEmBus driver
             import time
             import gc
             for attempt in range(1, 4):
