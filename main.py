@@ -28,6 +28,7 @@ import threading
 def resource_path(relative_path):
     """Get path to bundled resource. Works in both dev and PyInstaller exe."""
     if hasattr(sys, '_MEIPASS'):
+        os.chdir(sys._MEIPASS) 
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), relative_path)
 
