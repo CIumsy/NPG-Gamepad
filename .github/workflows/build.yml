@@ -1,0 +1,37 @@
+name: Build NPG Controller
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # lets you trigger manually from GitHub UI too
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Download ViGEmBus installer
+        run: Invoke-WebRequest -Uri "https://github.com/nefarius/ViGEmBus/releases/download/v1.22.0/ViGEmBus_1.22.0_x64_x86_arm64.exe" -OutFile "ViGEmBus_1.22.0_x64_x86_arm64.exe"
+
+      - name: Build executable
+        run: pyinstaller build.spec --clean
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NPG-Controller
+          path: dist/NPG Controller.exe

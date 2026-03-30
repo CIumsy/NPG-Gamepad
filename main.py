@@ -28,15 +28,15 @@ import threading
 def resource_path(relative_path):
     """Get path to bundled resource. Works in both dev and PyInstaller exe."""
     if hasattr(sys, '_MEIPASS'):
-        os.chdir(sys._MEIPASS) 
+        os.chdir(sys._MEIPASS)  # makes Qt url() in stylesheets resolve correctly
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), relative_path)
 
 def ensure_vigembus():
-    """Install ViGEmBus driver if not already installed."""
+    """Install ViGEmBus driver if not already installed and running."""
     import subprocess
-    result = subprocess.run(['sc', 'query', 'ViGEmBus'], capture_output=True)
-    if result.returncode == 0:
+    result = subprocess.run(['sc', 'query', 'ViGEmBus'], capture_output=True, text=True)
+    if result.returncode == 0 and 'RUNNING' in result.stdout:
         return True
     installer = resource_path('ViGEmBus_1.22.0_x64_x86_arm64.exe')
     if not os.path.exists(installer):
@@ -46,7 +46,10 @@ def ensure_vigembus():
     try:
         import ctypes, time
         ctypes.windll.shell32.ShellExecuteW(None, "runas", installer, "/quiet /norestart", None, 1)
-        time.sleep(5)
+        time.sleep(10)  # driver install takes a few seconds
+        # Try to start the service if it isn't running yet
+        subprocess.run(['sc', 'start', 'ViGEmBus'], capture_output=True)
+        time.sleep(2)
         print('ViGEmBus installed successfully')
         return True
     except Exception as e:
