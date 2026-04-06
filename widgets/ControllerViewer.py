@@ -11,7 +11,7 @@ import math
 from PySide6.QtWidgets import QWidget
 from PySide6.QtCore import Qt, QRectF, QPointF
 from PySide6.QtGui import (
-    QPainter, QColor, QPen, QPainterPath, QPolygonF, QRadialGradient
+    QPainter, QColor, QPen, QPainterPath, QPolygonF
 )
 from PySide6.QtSvg import QSvgRenderer
 import os
@@ -56,10 +56,8 @@ class ControllerViewer(QWidget):
         super().__init__(parent)
         self.setMinimumSize(540, 250)
 
-        svg_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "..", "NPG SNES with Logo.svg"
-        )
+        from gamepad import resource_path
+        svg_path = resource_path("NPG SNES with Logo.svg")
         self._renderer = QSvgRenderer(svg_path)
         self.button_states: dict[str, float] = {k: 0.0 for k in self._ALL_KEYS}
 
@@ -75,7 +73,7 @@ class ControllerViewer(QWidget):
                 t = self._renderer.transformForElement(eid)
                 self._vb_rects[eid] = t.mapRect(b)
 
-    # ── Public API ───────────────────────────────────────────────────────
+    # Public API 
 
     def update_button(self, name: str, value):
         if name in self.button_states:
@@ -93,7 +91,7 @@ class ControllerViewer(QWidget):
     def _pressed(self, name: str) -> bool:
         return self.button_states.get(name, 0.0) > 0.5
 
-    # ── Coordinate mapping ───────────────────────────────────────────────
+    # Coordinate mapping 
 
     def _vb_to_widget(self, rect: QRectF) -> QRectF:
         vw = self._renderer.viewBoxF().width()
@@ -113,7 +111,7 @@ class ControllerViewer(QWidget):
             return None
         return self._vb_to_widget(vb)
 
-    # ── Paint ────────────────────────────────────────────────────────────
+    # Paint 
 
     def paintEvent(self, _event):
         p = QPainter(self)
@@ -143,7 +141,7 @@ class ControllerViewer(QWidget):
 
         p.end()
 
-    # ── Shoulder buttons: rendered accurately to silhouette ───────────────
+    # Shoulder buttons: rendered accurately to silhouette 
 
     def _draw_shoulder_highlights(self, p: QPainter):
         from PySide6.QtGui import QImage
@@ -190,7 +188,7 @@ class ControllerViewer(QWidget):
         # Draw the neatly masked perfectly curved highlight flawlessly atop the main view!
         p.drawImage(self._render_rect.topLeft(), img)
 
-    # ── Face buttons: SNES colour fills ──────────────────────────────────
+    # Face buttons: SNES colour fills 
 
     def _draw_face_highlights(self, p: QPainter):
         for name, eid in self._FACE_BUTTONS.items():
@@ -213,7 +211,7 @@ class ControllerViewer(QWidget):
             # Draw slightly inset to fit perfectly inside the SVG's black stroke
             p.drawEllipse(QPointF(cx, cy), rx - 0.8, ry - 0.8)
 
-    # ── D-pad: directional triangles ─────────────────────────────────────
+    # D-pad: directional triangles 
 
     def _draw_dpad_highlights(self, p: QPainter):
         cross = self._widget_rect(self._DPAD_CROSS_ID)
@@ -279,7 +277,7 @@ class ControllerViewer(QWidget):
             p.setBrush(QColor("#000000"))
             p.drawPath(tri_path)
 
-    # ── Start button: black angled pill ──────────────────────────────────
+    # Start button: black angled pill 
 
     def _draw_start_highlight(self, p: QPainter):
         if not self._pressed("Start"):
@@ -292,7 +290,7 @@ class ControllerViewer(QWidget):
 
         vw = self._renderer.viewBoxF().width()
         scale = self._render_rect.width() / vw
-        # ── TUNING: adjust these two values to resize the pill highlight ──
+        # TUNING: adjust these two values to resize the pill highlight 
         pill_half_len = 6.2 * scale
         pill_half_w = 2.85 * scale
 
