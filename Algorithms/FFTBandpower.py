@@ -119,16 +119,3 @@ class FFTBandpower:
         self.band_percentages = {k: 0.0 for k in self.band_percentages}
         self.peak_frequency = 0.0
 
-
-# Example usage:
-# Signal chain for EEG focus: Raw -> Notch -> LP45 (EEG filter) -> FFTBandpower
-#
-# fft = FFTBandpower(fft_size=512, sample_rate=500)
-# for sample in filtered_eeg_samples:
-#     if fft.add_sample(sample):
-#         bands = fft.get_band_percentages()
-#         print(f"Delta:{bands['delta']:.1f}% Theta:{bands['theta']:.1f}% "
-#               f"Alpha:{bands['alpha']:.1f}% Beta:{bands['beta']:.1f}% "
-#               f"Gamma:{bands['gamma']:.1f}% Peak:{fft.get_peak_frequency():.1f}Hz")
-#         if fft.is_focused():
-#             print("FOCUSED!")

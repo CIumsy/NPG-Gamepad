@@ -87,7 +87,7 @@ class ECGDetector:
         """Scale a sample count from base 125Hz to current sample rate."""
         return ((original * self.fs) + 62) // 125
 
-    # ── Public API ─────────────────────────────────────────────────────────────
+    # Public API 
 
     def process(self, adc_value):
         """
@@ -154,7 +154,7 @@ class ECGDetector:
         """Reset all state to initial values."""
         self.__init__(self.fs)
 
-    # ── Internals ──────────────────────────────────────────────────────────────
+    # Internals 
 
     def _derivative5(self, x):
         """5-point derivative (Pan-Tompkins)."""
@@ -367,13 +367,3 @@ class ECGDetector:
         self.sb_peak_val = 0.0
         self.sb_peak_time = 0
 
-
-# Example usage:
-# Signal chain for ECG: Raw -> Notch -> BPECG (bandpass) -> ECGDetector
-#
-# detector = ECGDetector(sample_rate=500)
-# for adc_value in raw_ecg_samples:
-#     # Note: pass the bandpass-filtered value (centered around 0),
-#     # or pass raw ADC (detector subtracts 2048 internally)
-#     if detector.process(adc_value):
-#         print(f"BEAT! BPM: {detector.get_bpm():.0f}")
