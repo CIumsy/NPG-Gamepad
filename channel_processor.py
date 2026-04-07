@@ -8,9 +8,9 @@ from filters.HP5 import HP5
 from filters.LP45 import LP45
 from filters.BPECG import BPECG
 from filters.BP1To10 import BP1To10
-from filters.EnvelopeDetector import EnvelopeDetector
-from filters.BaselineTracker import BaselineTracker
-from filters.FFTBandpower import FFTBandpower
+from Algorithms.EnvelopeDetector import EnvelopeDetector
+from Algorithms.BaselineTracker import BaselineTracker
+from Algorithms.FFTBandpower import FFTBandpower
 
 
 class ChannelProcessor:
