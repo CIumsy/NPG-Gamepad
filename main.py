@@ -43,7 +43,7 @@ def qt_message_handler(mode, context, message):
 qInstallMessageHandler(qt_message_handler)
 
 from gamepad import resource_path, HAS_VGAMEPAD, SNES_TO_XUSB, ensure_vigembus
-from config import MAX_CHANNELS, FILTER_MAP, EMG_SCALE, BLINK_SCALE, EYE_SCALE, JAW_SCALE, ECG_SCALE, clamp100
+from config import MAX_CHANNELS, FILTER_MAP, EMG_SCALE, BLINK_SCALE, EYE_SCALE, JAW_SCALE, ECG_SCALE, clamp100, DEFAULT_THRESHOLDS
 from ble_manager import BLEManager
 from channel_processor import ChannelProcessor
 from widgets.ThresholdBar import ThresholdBar
@@ -159,21 +159,7 @@ class NPGController:
 
     def _init_threshold_bars(self):
         """Replace QProgressBars with ThresholdBars (draggable threshold + green detect)."""
-        defaults = {
-            'pbFocus':    50,
-            'pbBlink':    17,
-            'pbLeftEye':  50,
-            'pbRightEye': 50,
-            'pbJaw':      32,
-            'pbECG':      50,
-            'pbEMG1':     40,
-            'pbEMG2':     40,
-            'pbEMG3':     40,
-            'pbEMG4':     40,
-            'pbEMG5':     40,
-            'pbEMG6':     40,
-        }
-        for name, thresh in defaults.items():
+        for name, thresh in DEFAULT_THRESHOLDS.items():
             old_pb = getattr(self.ui, name, None)
             if old_pb is None:
                 continue
