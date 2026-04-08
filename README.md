@@ -6,8 +6,8 @@ This app connects to the Neuro Playground (NPG) Lite over Bluetooth to read your
 
 ## Features
 
-- **Wireless:** Connects instantly to the NPG Lite device via Bluetooth Low Energy(BLE).
-- **Upto 6 Bio-potential Signals:** Supports up to 6 channels processing muscles (EMG), brainwaves and blinks (EEG), eye movements (EOG), and heartbeats (ECG).
+- **Wireless:** Connects instantly to the NPG Lite device via Bluetooth Low Energy (BLE).
+- **Up to 6 Bio-potential Signals:** Supports up to 6 channels processing muscles (EMG), brainwaves and blinks (EEG), eye movements (EOG), and heartbeats (ECG).
 - **Custom Mapping:** A simple UI that lets you choose which action (like a "Double Jaw Clench") triggers which button (like the "A" button or "Right Trigger").
 - **Zero Config:** The app automatically handles and installs the required virtual Xbox controller driver (`ViGEmBus`) on Windows for you.
 - **Built-in Tester:** See your signals light up in real-time and test your virtual controller before jumping into a game.
@@ -29,23 +29,23 @@ If you want to view or edit the code directly:
 1. Clone this repository to your PC.
 2. Make sure you have Python installed.
 3. Open a terminal in the project folder and create a virtual environment:
-   ```
+   ```bash
    python -m venv .venv
    ```
 4. Activate the virtual environment:
    - **Windows:** `.venv\Scripts\activate`
    - **Mac/Linux:** `source .venv/bin/activate`
 5. Install the required libraries:
-   ```
+   ```bash
    pip install -r requirements.txt
    ```
 6. Run the main script:
-   ```
+   ```bash
    python main.py
    ```
 
 ### Building the .exe yourself
 If you want to package your own version of the `.exe`:
-```
+```bash
 pyinstaller build.spec
 ```

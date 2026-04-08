@@ -87,9 +87,9 @@ class NPGConnection:
         ]
 
         if npg_devices:
-            print(f"Found {len(npg_devices)} NPG device(s)")
+            print(f"Found {len(npg_devices)} NPG Lite device(s)")
         else:
-            print("No NPG devices found")
+            print("No NPG Lite devices found")
 
         return npg_devices
 
@@ -296,8 +296,9 @@ async def _cli_main():
     except KeyboardInterrupt:
         print("\n")
     finally:
+        total_samples = connection.sample_count
         await connection.disconnect()
-        print(f"\n Total samples: {connection.sample_count}")
+        print(f"\n Total samples: {total_samples}")
 
 
 if __name__ == "__main__":

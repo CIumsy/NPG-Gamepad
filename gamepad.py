@@ -7,7 +7,6 @@ import os
 def resource_path(relative_path):
     """Get path to bundled resource. Works in both dev and PyInstaller exe."""
     if hasattr(sys, '_MEIPASS'):
-        os.chdir(sys._MEIPASS)
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), relative_path)
 
@@ -26,11 +25,20 @@ def ensure_vigembus():
     try:
         import ctypes, time
         ctypes.windll.shell32.ShellExecuteW(None, "runas", installer, "/quiet /norestart", None, 1)
-        time.sleep(10)
-        subprocess.run(['sc', 'start', 'ViGEmBus'], capture_output=True)
-        time.sleep(2)
-        print('ViGEmBus installed successfully')
-        return True
+        # Poll for service availability (max ~30 seconds)
+        for _ in range(30):
+            time.sleep(1)
+            result = subprocess.run(['sc', 'query', 'ViGEmBus'], capture_output=True, text=True)
+            if result.returncode == 0:
+                subprocess.run(['sc', 'start', 'ViGEmBus'], capture_output=True)
+                time.sleep(1)
+                # Verify running
+                result = subprocess.run(['sc', 'query', 'ViGEmBus'], capture_output=True, text=True)
+                if 'RUNNING' in result.stdout:
+                    print('ViGEmBus installed and started successfully')
+                    return True
+        print('ViGEmBus installation timed out')
+        return False
     except Exception as e:
         print(f'ViGEmBus install failed: {e}')
         return False

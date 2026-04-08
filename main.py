@@ -493,23 +493,26 @@ class NPGController:
             self.processors[ch].set_filter(FILTER_MAP.get(filter_id, 'emg'))
         self._apply_notch_to_all()
 
-        # Create virtual gamepad (retry up to 3 times if ViGEmBus is slow)
+        # Create virtual gamepad (staggered attempts on main thread to avoid UI freeze)
         if HAS_VGAMEPAD and self.gamepad is None:
             ensure_vigembus()
-            import time
             import gc
-            for attempt in range(1, 4):
+
+            def _try_create_gamepad(attempt):
                 try:
-                    gp = vg.VX360Gamepad()
-                    self.gamepad = gp
+                    self.gamepad = vg.VX360Gamepad()
+                    self.ui.statusbar.showMessage("Virtual gamepad connected", 4000)
                     print("Virtual gamepad created")
-                    break
                 except Exception as e:
                     print(f"Gamepad attempt {attempt}/3 failed: {e}")
                     self.gamepad = None
                     gc.collect()
                     if attempt < 3:
-                        time.sleep(1.0)
+                        QTimer.singleShot(1000, lambda: _try_create_gamepad(attempt + 1))
+                    else:
+                        self.ui.statusbar.showMessage("Failed to create virtual gamepad.", 6000)
+
+            _try_create_gamepad(1)
 
         # Select Ch1 in input selector and show its bars
         self.ui.btnSel_Input_Ch1.setChecked(True)
@@ -630,8 +633,13 @@ class NPGController:
         if parent_layout is None:
             return
 
+        if not hasattr(self, '_saved_combo_keys'):
+            self._saved_combo_keys = {}
+
         if self._emg_combo_rows:
-            for lbl, bar, cmb, _, _ in self._emg_combo_rows:
+            for lbl, bar, cmb, ch_a, ch_b in self._emg_combo_rows:
+                # Save previous combination keys
+                self._saved_combo_keys[(ch_a, ch_b)] = cmb.currentIndex()
                 for i in range(parent_layout.count() - 1, -1, -1):
                     item = parent_layout.itemAt(i)
                     sub = item.layout() if item else None
@@ -689,6 +697,8 @@ class NPGController:
             cmb = QComboBox()
             cmb.setMinimumWidth(80)
             cmb.addItems(snes_keys)
+            if (ch_a, ch_b) in self._saved_combo_keys:
+                cmb.setCurrentIndex(self._saved_combo_keys[(ch_a, ch_b)])
 
             row_layout.addWidget(lbl)
             row_layout.addWidget(bar)
@@ -809,8 +819,9 @@ class NPGController:
             self.ui.cmbDoubleJawClench.setVisible(has_jaw)
 
             for i, (lbl, pb, cmb) in enumerate(emg_slots):
-                if i < len(emg_chs):
-                    lbl.setText(f' EMG(Ch{emg_chs[i]})')
+                ch_num = i + 1
+                if ch_num in emg_chs:
+                    lbl.setText(f' EMG(Ch{ch_num})')
                     lbl.setVisible(True)
                     pb.setVisible(True)
                     cmb.setVisible(True)
@@ -860,17 +871,11 @@ class NPGController:
                         fixed['ecg'][1].setVisible(True)
                         fixed['ecg'][2].setVisible(True)
                     elif ftype == 'emg':
-                        emg_bar_idx = 0
-                        for prev_ch in range(ch_idx):
-                            prev_cb = getattr(self.ui, f'grpCh{prev_ch + 1}')
-                            if prev_cb.isChecked() and self.processors[prev_ch].filter_type == 'emg':
-                                emg_bar_idx += 1
-                        if emg_bar_idx < len(emg_slots):
-                            lbl, pb, cmb = emg_slots[emg_bar_idx]
-                            lbl.setText(f' EMG(Ch{sel})')
-                            lbl.setVisible(True)
-                            pb.setVisible(True)
-                            cmb.setVisible(True)
+                        lbl, pb, cmb = emg_slots[ch_idx]
+                        lbl.setText(f' EMG(Ch{sel})')
+                        lbl.setVisible(True)
+                        pb.setVisible(True)
+                        cmb.setVisible(True)
                         for lbl2, bar2, cmb2, ch_a, ch_b in self._emg_combo_rows:
                             if sel == ch_a or sel == ch_b:
                                 lbl2.setVisible(True)
@@ -899,7 +904,6 @@ class NPGController:
         left_eye_set = right_eye_set = False
         emg_bars = [self.ui.pbEMG1, self.ui.pbEMG2, self.ui.pbEMG3,
                     self.ui.pbEMG4, self.ui.pbEMG5, self.ui.pbEMG6]
-        emg_idx = 0
         emg_ch_envelopes = {}
 
         jaw_owner = None
@@ -941,9 +945,7 @@ class NPGController:
                     jaw_set = True
 
             elif p.filter_type == 'emg':
-                if emg_idx < 6:
-                    emg_bars[emg_idx].setValue(clamp100(p.val_emg_envelope, EMG_SCALE))
-                    emg_idx += 1
+                emg_bars[ch].setValue(clamp100(p.val_emg_envelope, EMG_SCALE))
                 emg_ch_envelopes[ch + 1] = p.val_emg_envelope
 
             elif p.filter_type == 'ecg' and not ecg_set:
@@ -956,8 +958,9 @@ class NPGController:
         if not right_eye_set: self.ui.pbRightEye.setValue(0)
         if not jaw_set:       self.ui.pbJaw.setValue(0)
         if not ecg_set:       self.ui.pbECG.setValue(0)
-        for i in range(emg_idx, 6):
-            emg_bars[i].setValue(0)
+        for i in range(6):
+            if (i + 1) not in emg_ch_envelopes:
+                emg_bars[i].setValue(0)
 
         # EMG combination rows update
         for lbl, bar, cmb, ch_a, ch_b in self._emg_combo_rows:
@@ -1001,6 +1004,8 @@ class NPGController:
             if bar.detected:
                 keys_to_press.add(key_name)
 
+        keys_to_press.update(self._detection_flash_keys)
+
         if self.gamepad:
             for key_name in keys_to_press:
                 xusb = SNES_TO_XUSB.get(key_name)
@@ -1034,8 +1039,6 @@ class NPGController:
             all_keys = ["A", "B", "X", "Y", "Dpad Up", "Dpad Down",
                         "Dpad Left", "Dpad Right", "L", "R", "Start"]
             for key_name in all_keys:
-                if key_name in self._detection_flash_keys:
-                    continue
                 self.test_dialog.viewer.update_button(
                     key_name, key_name in keys_to_press)
 
@@ -1089,53 +1092,17 @@ class NPGController:
                 self._trigger_detection_action(self.ui.cmbDoubleJawClench)
 
     def _trigger_detection_action(self, cmb):
-        """Press and quickly release a gamepad button for a detection event."""
+        """Register a detection event to press a gamepad button for 500ms."""
         key_name = cmb.currentText()
         if key_name == 'None':
             return
             
-        xusb = SNES_TO_XUSB.get(key_name)
-        
-        if self.gamepad and xusb:
-            if xusb == 'LT':
-                self.gamepad.left_trigger_float(value_float=1.0)
-                self.gamepad.update()
-                QTimer.singleShot(500, lambda: self._release_trigger('LT'))
-            elif xusb == 'RT':
-                self.gamepad.right_trigger_float(value_float=1.0)
-                self.gamepad.update()
-                QTimer.singleShot(500, lambda: self._release_trigger('RT'))
-            else:
-                self.gamepad.press_button(xusb)
-                self.gamepad.update()
-                QTimer.singleShot(500, lambda btn=xusb: self._release_button(btn))
-            print(f"Pressed '{key_name}'")
-
         self._detection_flash_keys.add(key_name)
-
-        if self.test_dialog:
-            self.test_dialog.viewer.update_button(key_name, True)
+        print(f"Triggered detection for '{key_name}'")
 
         def _end_flash(k=key_name):
             self._detection_flash_keys.discard(k)
-            if self.test_dialog:
-                self.test_dialog.viewer.update_button(k, False)
         QTimer.singleShot(500, _end_flash)
-
-    def _release_trigger(self, which):
-        if not self.gamepad:
-            return
-        if which == 'LT':
-            self.gamepad.left_trigger_float(value_float=0.0)
-        else:
-            self.gamepad.right_trigger_float(value_float=0.0)
-        self.gamepad.update()
-
-    def _release_button(self, xusb):
-        if not self.gamepad:
-            return
-        self.gamepad.release_button(xusb)
-        self.gamepad.update()
 
     def _destroy_gamepad(self):
         """Safely tear down the virtual gamepad and free the ViGEmBus slot."""

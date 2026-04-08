@@ -52,16 +52,23 @@ class ChannelProcessor:
     # Configuration
 
     def set_notch(self, setting):
-        if setting == '50':   self.notch = BS50()
-        elif setting == '60': self.notch = BS60()
-        else:                 self.notch = None
+        if setting == '50':   
+            self.notch = BS50()
+        elif setting == '60': 
+            self.notch = BS60()
+        else:                 
+            self.notch = None
 
     def set_filter(self, ftype):
         self.filter_type = ftype
-        if ftype == 'emg':   self._init_emg()
-        elif ftype == 'eeg': self._init_eeg()
-        elif ftype == 'eog': self._init_eog()
-        elif ftype == 'ecg': self._init_ecg()
+        if ftype == 'emg':   
+            self._init_emg()
+        elif ftype == 'eeg': 
+            self._init_eeg()
+        elif ftype == 'eog': 
+            self._init_eog()
+        elif ftype == 'ecg': 
+            self._init_ecg()
 
     # Per-sample processing
 

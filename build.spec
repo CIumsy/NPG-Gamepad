@@ -1,11 +1,23 @@
-import os, glob
+import os
+from pathlib import Path
+import vgamepad
 
-# Find vgamepad DLLs
-vgamepad_path = os.path.join('.venv', 'Lib', 'site-packages', 'vgamepad', 'win', 'vigem', 'client')
+vgamepad_pkg_path = Path(vgamepad.__file__).parent
+vgamepad_path = vgamepad_pkg_path / 'win' / 'vigem' / 'client'
+
+if not vgamepad_path.exists():
+    raise FileNotFoundError(f"vgamepad DLL directory not found: {vgamepad_path}")
+
+site_packages_path = vgamepad_pkg_path.parent
 vgamepad_dlls = []
-for dll in glob.glob(os.path.join(vgamepad_path, '**', '*.dll'), recursive=True):
-    dest = os.path.dirname(dll).replace('.venv\\Lib\\site-packages\\', '')
-    vgamepad_dlls.append((dll, dest))
+for dll in vgamepad_path.rglob('*.dll'):
+    dest = str(dll.parent.relative_to(site_packages_path))
+    vgamepad_dlls.append((str(dll), dest))
+
+vigem_installers = sorted(Path('.').glob('ViGEmBus_*.exe'))
+if not vigem_installers:
+    raise FileNotFoundError("No ViGEmBus_*.exe found in project root")
+vigem_installer = str(vigem_installers[-1])
 
 a = Analysis(
     ['main.py'],
@@ -15,7 +27,7 @@ a = Analysis(
         ('Controller-Keybinds.ui', '.'),
         ('NPG SNES with Logo.svg', '.'),
         ('icons', 'icons'),
-        ('ViGEmBus_1.22.0_x64_x86_arm64.exe', '.'),
+        (vigem_installer, '.'),
     ],
     hiddenimports=['vgamepad', 'bleak', 'PySide6.QtSvg'],
 )
