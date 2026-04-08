@@ -23,6 +23,10 @@ Thank you for being part of this journey with us!
 import sys
 import os
 
+# Essential for PyInstaller one-file mode so PySide CSS/UI can find relative asset paths like 'icons/*.svg'
+if hasattr(sys, '_MEIPASS'):
+    os.chdir(sys._MEIPASS)
+
 from PySide6.QtWidgets import (
     QApplication, QInputDialog, QMessageBox, QButtonGroup, QDialog
 )
