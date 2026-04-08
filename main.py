@@ -1083,14 +1083,15 @@ class NPGController:
             elif p.filter_type == 'eog' and jaw_sample is None:
                 jaw_sample = p.val_jaw_envelope
 
-        if blink_sample is not None and self.ui.grpDoubleBlink.isVisible():
+        if blink_sample is not None:
+            # Always process to maintain moving window state, then check if we should trigger
             event = self.blink_detector.process(blink_sample, now_ms)
             if event == 'double' and self.ui.grpDoubleBlink.isChecked():
                 self._trigger_detection_action(self.ui.cmbDoubleBlink)
             elif event == 'triple' and self.ui.grpTripleBlink.isChecked():
                 self._trigger_detection_action(self.ui.cmbTripleBlink)
 
-        if jaw_sample is not None and self.ui.grpDoubleJawClench.isVisible():
+        if jaw_sample is not None:
             event = self.jaw_detector.process(jaw_sample, now_ms)
             if event == 'double' and self.ui.grpDoubleJawClench.isChecked():
                 self._trigger_detection_action(self.ui.cmbDoubleJawClench)
@@ -1115,12 +1116,12 @@ class NPGController:
             try:
                 self.gamepad.reset()
                 self.gamepad.update()
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Warning: Virtual gamepad reset failed: {e}")
             try:
                 del self.gamepad
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Warning: Virtual gamepad deletion failed: {e}")
             self.gamepad = None
             self._pressed_buttons.clear()
             gc.collect()
