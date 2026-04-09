@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>NPG Gamepad Emulator</string>
+   <string>NPG Lite SNES</string>
   </property>
   <property name="styleSheet">
    <string notr="true">/* BLACK &amp; WHITE GAMING THEME - CORRECTED */
