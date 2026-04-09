@@ -16,7 +16,7 @@ This app connects to the Neuro Playground (NPG) Lite over Bluetooth to read your
 
 The easiest way to use this is to grab the pre-built standalone `.exe` file.
 
-1. Download the latest `NPG-Controller.exe` from the Releases / GitHub Actions tab.
+1. Download the latest `NPG Lite SNES.exe` from the Releases / GitHub Actions tab.
 2. Double-click the file to open it.
 3. If it's your first time running the app, it will ask for admin permissions to quickly install the `ViGEmBus` driver. This allows Windows to see your body as a real Xbox controller.
 4. Turn on your NPG Lite device using the On/Off switch and click the "CONNECT" button on the app.

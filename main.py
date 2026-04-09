@@ -28,10 +28,11 @@ if hasattr(sys, '_MEIPASS'):
     os.chdir(sys._MEIPASS)
 
 from PySide6.QtWidgets import (
-    QApplication, QInputDialog, QMessageBox, QButtonGroup, QDialog
+    QApplication, QInputDialog, QMessageBox, QButtonGroup, QDialog,
+    QScrollArea, QWidget, QVBoxLayout
 )
 from PySide6.QtUiTools import QUiLoader
-from PySide6.QtCore import QFile, QTimer, qInstallMessageHandler
+from PySide6.QtCore import QFile, QTimer, Qt, qInstallMessageHandler
 
 def qt_message_handler(mode, context, message):
     # Ignore unfixable SVG and Font warnings from Qt
@@ -108,6 +109,10 @@ class NPGLiteSNES:
         self.ui = loader.load(ui_file)
         ui_file.close()
 
+        # Make both panels scrollable so content never disappears
+        self._make_panel_scrollable(self.ui.configGroup)
+        self._make_panel_scrollable(self.ui.inputsGroup)
+
         # State
         self.num_channels = 0
         self.is_connected = False
@@ -158,6 +163,48 @@ class NPGLiteSNES:
         self.ui.grpTripleBlink.setVisible(False)
         self.ui.grpDoubleJawClench.setVisible(False)
         self._update_input_visibility()
+
+    # Scrollable panels
+
+    @staticmethod
+    def _make_panel_scrollable(group_box):
+        """Wrap a QGroupBox's content in a QScrollArea so it scrolls
+        instead of crushing/hiding widgets on small windows."""
+        old_layout = group_box.layout()
+        if old_layout is None:
+            return
+
+        # Create a container widget and move all existing items into it
+        container = QWidget()
+        new_layout = QVBoxLayout(container)
+        new_layout.setContentsMargins(
+            old_layout.contentsMargins().left(),
+            old_layout.contentsMargins().top(),
+            old_layout.contentsMargins().right(),
+            old_layout.contentsMargins().bottom(),
+        )
+        new_layout.setSpacing(old_layout.spacing())
+
+        while old_layout.count():
+            item = old_layout.takeAt(0)
+            if item.widget():
+                new_layout.addWidget(item.widget())
+            elif item.layout():
+                new_layout.addLayout(item.layout())
+            elif item.spacerItem():
+                new_layout.addItem(item.spacerItem())
+
+        # Create scroll area
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(container)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("QScrollArea{background:transparent;}"
+                             "QScrollArea>QWidget>QWidget{background:transparent;}")
+
+        # Put scroll area into the group box
+        old_layout.addWidget(scroll)
 
     # Threshold Bars
 

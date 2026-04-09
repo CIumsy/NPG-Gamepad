@@ -10,6 +10,12 @@
     <height>842</height>
    </rect>
   </property>
+  <property name="minimumSize">
+   <size>
+    <width>960</width>
+    <height>640</height>
+   </size>
+  </property>
   <property name="windowTitle">
    <string>NPG Lite SNES</string>
   </property>
@@ -273,11 +279,11 @@ QPushButton:checked:disabled {
          </sizepolicy>
         </property>
         <property name="minimumSize">
-         <size>
-          <width>420</width>
-          <height>0</height>
-         </size>
-        </property>
+          <size>
+           <width>420</width>
+           <height>0</height>
+          </size>
+         </property>
         <property name="title">
          <string>SIGNAL CONFIGURATION</string>
         </property>
@@ -1729,12 +1735,18 @@ QPushButton:checked:disabled {
       </item>
       <item>
        <widget class="QPushButton" name="btnConnect">
-        <property name="minimumSize">
-         <size>
-          <width>86</width>
-          <height>52</height>
-         </size>
-        </property>
+         <property name="minimumSize">
+          <size>
+           <width>180</width>
+           <height>52</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>180</width>
+           <height>52</height>
+          </size>
+         </property>
         <property name="styleSheet">
          <string notr="true">QPushButton {
     qproperty-icon: url(icons/bluetooth.svg);
@@ -1771,12 +1783,18 @@ QPushButton:checked {
       </item>
       <item>
        <widget class="QPushButton" name="btnKeybinds">
-        <property name="minimumSize">
-         <size>
-          <width>86</width>
-          <height>52</height>
-         </size>
-        </property>
+         <property name="minimumSize">
+          <size>
+           <width>180</width>
+           <height>52</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>180</width>
+           <height>52</height>
+          </size>
+         </property>
         <property name="styleSheet">
          <string notr="true">QPushButton {
     qproperty-icon: url(icons/gamepad.svg);
@@ -1804,7 +1822,7 @@ QPushButton:checked {
 }</string>
         </property>
         <property name="text">
-         <string>KEYBINDS</string>
+          <string>TESTER</string>
         </property>
        </widget>
       </item>
