@@ -1,4 +1,4 @@
-name: Build NPG Controller
+name: Build NPG Lite SNES
 
 on:
   push:
@@ -33,5 +33,5 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NPG-Controller
-          path: dist/NPG Controller.exe
+          name: NPG-Lite-SNES
+          path: dist/NPG Lite SNES.exe

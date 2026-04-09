@@ -1,6 +1,6 @@
-# NPG Controller
+# NPG Lite SNES
 
-Play video games on Windows using your body signals. 
+**Play video games using your mind and body.**
 
 This app connects to the Neuro Playground (NPG) Lite over Bluetooth to read your body's electrical signals (EMG, EEG, EOG, ECG). It records these bio-potential signals like flexing a muscle, blinking your eyes, clenching your jaw, or focusing and converts them into standard Xbox controller button presses. This lets you play almost any PC game using just your mind and body.
 

@@ -34,6 +34,6 @@ a = Analysis(
 pyz = PYZ(a.pure)
 exe = EXE(
     pyz, a.scripts, a.binaries, a.datas, [],
-    name='NPG Controller',
+    name='NPG Lite SNES',
     console=True,
 )

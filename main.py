@@ -95,9 +95,9 @@ class ControllerTestDialog:
         self.viewer.update_button(action_name, value)
 
 
-# Main Controller
+# Main
 
-class NPGController:
+class NPGLiteSNES:
     def __init__(self):
         self.app = QApplication(sys.argv)
 
@@ -1142,5 +1142,5 @@ class NPGController:
 
 
 if __name__ == "__main__":
-    controller = NPGController()
+    controller = NPGLiteSNES()
     sys.exit(controller.run())
