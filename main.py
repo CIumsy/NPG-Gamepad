@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QFile, QTimer, Qt, qInstallMessageHandler
+from PySide6.QtGui import QIcon
 
 def qt_message_handler(mode, context, message):
     # Ignore unfixable SVG and Font warnings from Qt
@@ -101,6 +102,7 @@ class ControllerTestDialog:
 class NPGLiteSNES:
     def __init__(self):
         self.app = QApplication(sys.argv)
+        self.app.setWindowIcon(QIcon(resource_path("icons/app_icon.png")))
 
         # Load UI
         loader = QUiLoader()

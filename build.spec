@@ -36,4 +36,5 @@ exe = EXE(
     pyz, a.scripts, a.binaries, a.datas, [],
     name='NPG Lite SNES',
     console=True,
+    icon='icons/app_icon.ico',
 )
