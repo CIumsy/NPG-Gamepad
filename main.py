@@ -503,6 +503,8 @@ class NPGController:
             import gc
 
             def _try_create_gamepad(attempt):
+                if not self.is_connected:
+                    return
                 try:
                     self.gamepad = vg.VX360Gamepad()
                     self.ui.statusbar.showMessage("Virtual gamepad connected", 4000)
