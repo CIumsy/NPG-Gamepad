@@ -18,14 +18,24 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\pip\Cache
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Download and install ViGEmBus v1.22.0 silently
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/nefarius/ViGEmBus/releases/download/v1.22.0/ViGEmBus_1.22.0_x64_x86_arm64.exe" -OutFile "ViGEmBus_1.22.0_x64_x86_arm64.exe"
+          Start-Process -FilePath ".\ViGEmBus_1.22.0_x64_x86_arm64.exe" -ArgumentList "/quiet", "/norestart" -Wait
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
-
-      - name: Download ViGEmBus installer
-        run: Invoke-WebRequest -Uri "https://github.com/nefarius/ViGEmBus/releases/download/v1.22.0/ViGEmBus_1.22.0_x64_x86_arm64.exe" -OutFile "ViGEmBus_1.22.0_x64_x86_arm64.exe"
 
       - name: Build executable
         run: pyinstaller build.spec --clean
