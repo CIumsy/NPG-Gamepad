@@ -16,11 +16,33 @@ This app connects to the Neuro Playground (NPG) Lite over Bluetooth to read your
 
 The easiest way to use this is to grab the pre-built standalone `.exe` file.
 
-1. Download the latest `NPG Lite SNES.exe` from the Releases / GitHub Actions tab.
+1. Download the latest `NPG-Controller.exe` from the Releases / GitHub Actions tab.
 2. Double-click the file to open it.
 3. If it's your first time running the app, it will ask for admin permissions to quickly install the `ViGEmBus` driver. This allows Windows to see your body as a real Xbox controller.
 4. Turn on your NPG Lite device using the On/Off switch and click the "CONNECT" button on the app.
 5. Check the boxes for the channels you are using, select the type of signal and map it to gamepad buttons using the dropdowns, and launch your game!
+
+## Tutorial Video
+
+<video width="100%" controls autoplay loop muted playsinline>
+  <source src="Tutorial%20video.mp4" type="video/mp4">
+</video>
+
+## Electrode Placement
+
+Here are the recommended electrode placements for different bio-potential signals:
+
+### EMG (Electromyography)
+![EMG Placement](electrode-placement/EMG-Placement.png)
+
+### EEG (Electroencephalography)
+![EEG Placement](electrode-placement/EEG-Placement.png)
+
+### EOG (Electrooculography)
+![EOG Placement](electrode-placement/EOG-Placement.png)
+
+### ECG (Electrocardiography)
+![ECG Placement](electrode-placement/ECG-Placement.png)
 
 ## Running from source (For developers)
 
