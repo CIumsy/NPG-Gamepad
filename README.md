@@ -24,9 +24,7 @@ The easiest way to use this is to grab the pre-built standalone `.exe` file.
 
 ## Tutorial Video
 
-<video width="100%" controls autoplay loop muted playsinline>
-  <source src="Tutorial%20video.gif" type="video/gif">
-</video>
+![Tutorial Video](Tutorial%20video.gif)
 
 ## Electrode Placement
 
