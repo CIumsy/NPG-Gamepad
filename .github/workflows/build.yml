@@ -2,7 +2,8 @@ name: Build NPG Lite SNES
 
 on:
   push:
-    branches: [ main ]
+    tags:
+      - 'v*'
   workflow_dispatch:  # lets you trigger manually from GitHub UI too
 
 jobs:
@@ -42,8 +43,7 @@ jobs:
       - name: Build executable
         run: pyinstaller build.spec --clean
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: NPG-Lite-SNES
-          path: dist/NPG Lite SNES.exe
+          files: dist/NPG Lite SNES.exe
