@@ -1,5 +1,8 @@
 name: Build NPG Lite SNES
 
+permissions:
+  contents: write
+
 on:
   push:
     tags:
@@ -44,6 +47,8 @@ jobs:
         run: pyinstaller build.spec --clean
 
       - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
           files: dist/NPG Lite SNES.exe
