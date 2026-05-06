@@ -65,7 +65,7 @@ class NPGConnection:
         self._data_callback = None
         self._battery_callback = None
 
-    # ── Scanning ───────────────────────────────────────────────────────────────
+    # Scanning 
 
     @staticmethod
     async def scan(timeout: float = 10.0) -> list[NPGDevice]:
@@ -78,7 +78,7 @@ class NPGConnection:
         Returns:
             List of discovered NPGDevice objects.
         """
-        print(f"🔍 Scanning for NPG devices ({timeout}s)...")
+        print(f"Scanning for NPG Lite devices ({timeout}s)...")
 
         discovered = await BleakScanner.discover(timeout=timeout)
         npg_devices = [
@@ -87,13 +87,13 @@ class NPGConnection:
         ]
 
         if npg_devices:
-            print(f"✅ Found {len(npg_devices)} NPG device(s)")
+            print(f"Found {len(npg_devices)} NPG Lite device(s)")
         else:
-            print("❌ No NPG devices found")
+            print("No NPG Lite devices found")
 
         return npg_devices
 
-    # ── Connection ─────────────────────────────────────────────────────────────
+    # Connection 
 
     async def connect(self, npg_device: NPGDevice) -> None:
         """
@@ -103,7 +103,7 @@ class NPGConnection:
             npg_device: The device to connect to.
         """
         self.device = npg_device
-        print(f"📡 Connecting to {npg_device.name} ({npg_device.address})...")
+        print(f"Connecting to {npg_device.name} ({npg_device.address})...")
 
         self.client = BleakClient(npg_device.address, timeout=20.0)
         await self.client.connect()
@@ -111,7 +111,7 @@ class NPGConnection:
         if not self.client.is_connected:
             raise ConnectionError(f"Failed to connect to {npg_device.name}")
 
-        print(f"✅ Connected to {npg_device.name}")
+        print(f"Connected to {npg_device.name}")
 
         # Channel count is determined from device name
         self.num_channels = npg_device.expected_channels
@@ -120,7 +120,10 @@ class NPGConnection:
                 f"Cannot determine channel count from device name: {npg_device.name}. "
                 "Expected name containing '3CH' or '6CH'."
             )
-        print(f"📊 {self.num_channels}-channel mode")
+        if self.num_channels == 3:
+            print("Explorer or Ninja Playmate detected (3 channels)")
+        else:
+            print("Beast Playmate detected (6 channels)")
 
     async def disconnect(self) -> None:
         """Stop streaming (if active) and disconnect from the device."""
@@ -129,7 +132,7 @@ class NPGConnection:
 
         if self.client and self.client.is_connected:
             await self.client.disconnect()
-            print("🔌 Disconnected")
+            print("Disconnected")
 
         self._reset()
 
@@ -141,7 +144,7 @@ class NPGConnection:
         self.is_streaming = False
         self.sample_count = 0
 
-    # ── Callbacks ──────────────────────────────────────────────────────────────
+    # Callbacks 
 
     def on_data(self, callback) -> None:
         """
@@ -160,7 +163,7 @@ class NPGConnection:
         """
         self._battery_callback = callback
 
-    # ── Streaming ──────────────────────────────────────────────────────────────
+    # Streaming 
 
     async def start_streaming(self) -> None:
         """
@@ -178,14 +181,14 @@ class NPGConnection:
         try:
             await self.client.start_notify(BATTERY_CHAR_UUID, self._on_battery_notification)
         except Exception:
-            print("⚠️  Battery characteristic not available on this device")
+            print("Battery characteristic not available on this device")
 
         # Send START command
         await self.client.write_gatt_char(CONTROL_CHAR_UUID, CMD_START)
         self.is_streaming = True
         self.sample_count = 0
 
-        print(f"▶️  Streaming {self.num_channels} channels @ {SAMPLE_RATE} Hz")
+        print(f"Streaming {self.num_channels} channels @ {SAMPLE_RATE} Hz")
 
     async def stop_streaming(self) -> None:
         """Send STOP command and unsubscribe from notifications."""
@@ -209,9 +212,9 @@ class NPGConnection:
             pass
 
         self.is_streaming = False
-        print("⏹️  Streaming stopped")
+        print("Streaming stopped")
 
-    # ── Internal BLE notification handlers ─────────────────────────────────────
+    # Internal BLE notification handlers 
 
     def _on_data_notification(self, _sender, data: bytearray) -> None:
         """Handle incoming data notifications from DATA_CHAR_UUID."""
@@ -227,28 +230,28 @@ class NPGConnection:
             self._battery_callback(data[0])
 
 
-# ── Standalone CLI for testing ─────────────────────────────────────────────────
+# Standalone CLI for testing 
 
 async def _cli_main():
     """Interactive CLI: scan → select device → stream data."""
     connection = NPGConnection()
 
-    # ── Scan ────────────────────────────────────────────────────────────────
+    # Scan 
     devices = await connection.scan(timeout=10.0)
 
     if not devices:
         print("\nMake sure your NPG Lite is powered on and not connected to another app.")
         return
 
-    # ── Display found devices ───────────────────────────────────────────────
+    # Display found devices 
     print(f"\n{'═' * 55}")
-    print(f"  Found {len(devices)} NPG device(s):")
+    print(f"  Found {len(devices)} NPG Lite device(s):")
     print(f"{'═' * 55}")
     for i, dev in enumerate(devices, 1):
         print(f"  [{i}] {dev}")
     print(f"{'═' * 55}")
 
-    # ── Select device ───────────────────────────────────────────────────────
+    # Select device 
     if len(devices) == 1:
         selected = devices[0]
         print(f"\n→ Auto-selecting: {selected}")
@@ -263,10 +266,10 @@ async def _cli_main():
             except ValueError:
                 print("  Enter a valid number")
 
-    # ── Connect ─────────────────────────────────────────────────────────────
+    # Connect 
     await connection.connect(selected)
 
-    # ── Register callbacks ──────────────────────────────────────────────────
+    # Register callbacks 
     def on_data(samples, num_channels):
         for sample in samples:
             # Print every 50th sample (counter 0, 50, 100, ...) to avoid flooding
@@ -277,12 +280,12 @@ async def _cli_main():
                 print(f"  [#{sample['counter']:3d}] {ch_vals}")
 
     def on_battery(percentage):
-        print(f"  🔋 Battery: {percentage}%")
+        print(f"Battery: {percentage}%")
 
     connection.on_data(on_data)
     connection.on_battery(on_battery)
 
-    # ── Stream ──────────────────────────────────────────────────────────────
+    # Stream 
     await connection.start_streaming()
     print(f"\n  Press Ctrl+C to stop\n{'─' * 55}")
 
@@ -293,8 +296,9 @@ async def _cli_main():
     except KeyboardInterrupt:
         print("\n")
     finally:
+        total_samples = connection.sample_count
         await connection.disconnect()
-        print(f"\n📊 Total samples: {connection.sample_count}")
+        print(f"\n Total samples: {total_samples}")
 
 
 if __name__ == "__main__":

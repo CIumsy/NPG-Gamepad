@@ -35,15 +35,3 @@ class BaselineTracker:
         self.idx = 0
         self.filled = False
 
-
-# Example usage:
-# Signal chain for horizontal EOG: Raw -> Notch -> HP(1Hz) -> LP(10Hz) -> BaselineTracker
-#
-# baseline = BaselineTracker(256)   # ~0.5s window at 500Hz
-# for sample in filtered_eog_samples:
-#     baseline.update(sample)
-#     deviation = sample - baseline.get_baseline()
-#     if deviation > threshold:
-#         print("LEFT eye movement")
-#     elif deviation < -threshold:
-#         print("RIGHT eye movement")

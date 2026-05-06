@@ -13,8 +13,3 @@ class EnvelopeDetector:
         self.data_index = (self.data_index + 1) % self.buffer_size
 
         return (self.sum / self.buffer_size) * 2
-
-#   -Example Usage-
-# env = EnvelopeDetector(64)
-# for i in range(1000):
-#     print(env.get_envelope(i))

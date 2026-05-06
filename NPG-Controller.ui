@@ -10,8 +10,14 @@
     <height>842</height>
    </rect>
   </property>
+  <property name="minimumSize">
+   <size>
+    <width>960</width>
+    <height>640</height>
+   </size>
+  </property>
   <property name="windowTitle">
-   <string>NPG Gamepad Emulator</string>
+   <string>NPG Lite SNES</string>
   </property>
   <property name="styleSheet">
    <string notr="true">/* BLACK &amp; WHITE GAMING THEME - CORRECTED */
@@ -62,15 +68,16 @@ QGroupBox::title {
 }
 
 QCheckBox {
+    outline: none;
     color: #e8e8e8;
     spacing: 10px;
     font-size: 13px;
     font-weight: 700;
-    padding: 4px 0px;
+    padding: 6px 0px 6px 0px;
     background-color: transparent;
 }
 
-QCheckBox:hover {
+QCheckBox:hover:enabled, QCheckBox:focus:enabled {
     color: #ffffff;
 }
 
@@ -80,14 +87,20 @@ QCheckBox::indicator {
     border-radius: 4px;
     background-color: transparent;
     border: 2px solid #3a3a3a;
+    
 }
-
-QCheckBox::indicator:hover {
+QCheckBox::indicator:hover:enabled,
+QCheckBox::indicator:focus:enabled {
     border: 2px solid #ffffff;
 }
-
 QCheckBox::indicator:checked {
-    background-color: transparent;
+    background-color: #0a0a0a;
+    border: 2px solid #ffffff;
+    image: url(icons/check.svg);
+}
+QCheckBox::indicator:checked:hover:enabled,
+QCheckBox::indicator:checked:focus:enabled {
+    background-color: #0a0a0a;
     border: 2px solid #ffffff;
     image: url(icons/check.svg);
 }
@@ -156,7 +169,7 @@ QPushButton:hover {
 
 QLabel#lblFocus, QLabel#lblBlink, QLabel#lblJaw,
 QLabel#lblLeftEye, QLabel#lblRightEye,
-QLabel#lblEMG1, QLabel#lblEMG2, QLabel#lblEMG3, QLabel#lblEMG4, QLabel#lblECG {
+QLabel#lblEMG1, QLabel#lblEMG2, QLabel#lblEMG3, QLabel#lblEMG4, QLabel#lblEMG5, QLabel#lblEMG6, QLabel#lblECG {
     background-color: transparent;
 }
 
@@ -266,11 +279,11 @@ QPushButton:checked:disabled {
          </sizepolicy>
         </property>
         <property name="minimumSize">
-         <size>
-          <width>420</width>
-          <height>0</height>
-         </size>
-        </property>
+          <size>
+           <width>420</width>
+           <height>0</height>
+          </size>
+         </property>
         <property name="title">
          <string>SIGNAL CONFIGURATION</string>
         </property>
@@ -293,7 +306,7 @@ QPushButton:checked:disabled {
          <item>
           <widget class="QGroupBox" name="grpCh1">
            <property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet">
-            <string notr="true">QGroupBox#grpCh1{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:14px;padding:6px 8px;}QGroupBox#grpCh1::title{}</string>
+            <string notr="true">QGroupBox#grpCh1{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:22px;margin-bottom:0px;padding:12px 8px 6px 8px;}QGroupBox#grpCh1::title{}</string>
            </property>
            <property name="title">
             <string>Channel 1</string>
@@ -395,7 +408,7 @@ QPushButton:checked:disabled {
          <item>
           <widget class="QGroupBox" name="grpCh2">
            <property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet">
-            <string notr="true">QGroupBox#grpCh2{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:14px;padding:6px 8px;}QGroupBox#grpCh2::title{}</string>
+            <string notr="true">QGroupBox#grpCh2{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:22px;margin-bottom:0px;padding:12px 8px 6px 8px;}QGroupBox#grpCh2::title{}</string>
            </property>
            <property name="title">
             <string>Channel 2</string>
@@ -497,7 +510,7 @@ QPushButton:checked:disabled {
          <item>
           <widget class="QGroupBox" name="grpCh3">
            <property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet">
-            <string notr="true">QGroupBox#grpCh3{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:14px;padding:6px 8px;}QGroupBox#grpCh3::title{}</string>
+            <string notr="true">QGroupBox#grpCh3{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:22px;margin-bottom:0px;padding:12px 8px 6px 8px;}QGroupBox#grpCh3::title{}</string>
            </property>
            <property name="title">
             <string>Channel 3</string>
@@ -599,7 +612,7 @@ QPushButton:checked:disabled {
          <item>
           <widget class="QGroupBox" name="grpCh4">
            <property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet">
-            <string notr="true">QGroupBox#grpCh4{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:14px;padding:6px 8px;}QGroupBox#grpCh4::title{}</string>
+            <string notr="true">QGroupBox#grpCh4{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:22px;margin-bottom:0px;padding:12px 8px 6px 8px;}QGroupBox#grpCh4::title{}</string>
            </property>
            <property name="title">
             <string>Channel 4</string>
@@ -701,7 +714,7 @@ QPushButton:checked:disabled {
          <item>
           <widget class="QGroupBox" name="grpCh5">
            <property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet">
-            <string notr="true">QGroupBox#grpCh5{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:14px;padding:6px 8px;}QGroupBox#grpCh5::title{}</string>
+            <string notr="true">QGroupBox#grpCh5{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:22px;margin-bottom:0px;padding:12px 8px 6px 8px;}QGroupBox#grpCh5::title{}</string>
            </property>
            <property name="title">
             <string>Channel 5</string>
@@ -803,7 +816,7 @@ QPushButton:checked:disabled {
          <item>
           <widget class="QGroupBox" name="grpCh6">
            <property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="styleSheet">
-            <string notr="true">QGroupBox#grpCh6{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:14px;padding:6px 8px;}QGroupBox#grpCh6::title{}</string>
+            <string notr="true">QGroupBox#grpCh6{background-color:transparent;border:1px solid #2a2a2a;border-radius:8px;margin-top:22px;margin-bottom:0px;padding:12px 8px 6px 8px;}QGroupBox#grpCh6::title{}</string>
            </property>
            <property name="title">
             <string>Channel 6</string>
@@ -924,13 +937,6 @@ QPushButton:checked:disabled {
              <number>8</number>
             </property>
             <item>
-              <widget class="QCheckBox" name="chkNotch">
-               <property name="text">
-                <string />
-               </property>
-              </widget>
-             </item>
-            <item>
              <layout class="QHBoxLayout" name="notchFreqLayout">
               <property name="spacing">
                <number>0</number>
@@ -986,7 +992,7 @@ QPushButton:checked:disabled {
              </spacer>
             </item>
            </layout>
-          </widget>
+          <property name="checkable"><bool>true</bool></property><property name="checked"><bool>false</bool></property></widget>
          </item>
          <item>
           <spacer name="configSpacer">
@@ -1218,9 +1224,69 @@ QPushButton:checked:disabled {
             </widget>
            </item>
           </layout>
-         </item>
-         <item>
-          <layout class="QHBoxLayout" name="hLayoutLeftEye">
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="hLayoutBlinkSub">
+            <property name="spacing">
+             <number>12</number>
+            </property>
+            <item>
+             <widget class="QCheckBox" name="grpDoubleBlink">
+              <property name="text">
+               <string> Double Blink</string>
+              </property>
+              <property name="checked">
+               <bool>false</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="cmbDoubleBlink">
+              <property name="minimumSize">
+               <size>
+                <width>80</width>
+                <height>0</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QCheckBox" name="grpTripleBlink">
+              <property name="text">
+               <string> Triple Blink</string>
+              </property>
+              <property name="checked">
+               <bool>false</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="cmbTripleBlink">
+              <property name="minimumSize">
+               <size>
+                <width>80</width>
+                <height>0</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="spacerBlinkSub">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="hLayoutLeftEye">
            <property name="spacing">
             <number>12</number>
            </property>
@@ -1329,9 +1395,49 @@ QPushButton:checked:disabled {
             </widget>
            </item>
           </layout>
-         </item>
-         <item>
-          <layout class="QHBoxLayout" name="hLayoutECG">
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="hLayoutJawSub">
+            <property name="spacing">
+             <number>12</number>
+            </property>
+            <item>
+             <widget class="QCheckBox" name="grpDoubleJawClench">
+              <property name="text">
+               <string> Double Jaw Clench</string>
+              </property>
+              <property name="checked">
+               <bool>false</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="cmbDoubleJawClench">
+              <property name="minimumSize">
+               <size>
+                <width>80</width>
+                <height>0</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="spacerJawSub">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="hLayoutECG">
            <property name="spacing">
             <number>12</number>
            </property>
@@ -1515,6 +1621,82 @@ QPushButton:checked:disabled {
            </item>
           </layout>
          </item>
+          <item>
+           <layout class="QHBoxLayout" name="hLayoutEMG5">
+            <property name="spacing">
+             <number>12</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="lblEMG5">
+              <property name="minimumSize">
+               <size>
+                <width>100</width>
+                <height>0</height>
+               </size>
+              </property>
+              <property name="text">
+               <string> EMG(Ch5)</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QProgressBar" name="pbEMG5">
+              <property name="value">
+               <number>0</number>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="cmbEMG5">
+              <property name="minimumSize">
+               <size>
+                <width>80</width>
+                <height>0</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+
+          <item>
+           <layout class="QHBoxLayout" name="hLayoutEMG6">
+            <property name="spacing">
+             <number>12</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="lblEMG6">
+              <property name="minimumSize">
+               <size>
+                <width>100</width>
+                <height>0</height>
+               </size>
+              </property>
+              <property name="text">
+               <string> EMG(Ch6)</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QProgressBar" name="pbEMG6">
+              <property name="value">
+               <number>0</number>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="cmbEMG6">
+              <property name="minimumSize">
+               <size>
+                <width>80</width>
+                <height>0</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+
          <item>
           <spacer name="inputsSpacer">
            <property name="orientation">
@@ -1553,12 +1735,18 @@ QPushButton:checked:disabled {
       </item>
       <item>
        <widget class="QPushButton" name="btnConnect">
-        <property name="minimumSize">
-         <size>
-          <width>86</width>
-          <height>52</height>
-         </size>
-        </property>
+         <property name="minimumSize">
+          <size>
+           <width>180</width>
+           <height>52</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>180</width>
+           <height>52</height>
+          </size>
+         </property>
         <property name="styleSheet">
          <string notr="true">QPushButton {
     qproperty-icon: url(icons/bluetooth.svg);
@@ -1595,12 +1783,18 @@ QPushButton:checked {
       </item>
       <item>
        <widget class="QPushButton" name="btnKeybinds">
-        <property name="minimumSize">
-         <size>
-          <width>86</width>
-          <height>52</height>
-         </size>
-        </property>
+         <property name="minimumSize">
+          <size>
+           <width>180</width>
+           <height>52</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>180</width>
+           <height>52</height>
+          </size>
+         </property>
         <property name="styleSheet">
          <string notr="true">QPushButton {
     qproperty-icon: url(icons/gamepad.svg);
@@ -1628,7 +1822,7 @@ QPushButton:checked {
 }</string>
         </property>
         <property name="text">
-         <string>KEYBINDS</string>
+          <string>TESTER</string>
         </property>
        </widget>
       </item>

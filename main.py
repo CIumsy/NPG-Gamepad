@@ -1,240 +1,65 @@
 """
-NPG Gamepad Emulator — Main Application
-========================================
-Loads NPG-Controller.ui, connects to NPG Lite via BLE,
-processes signals through configurable filter chains,
-and displays live signal inputs on progress bars.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Usage:  python main.py
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+Copyright (c) 2026 Krishnanshu Mittal - krishnanshu@upsidedownlabs.tech
+Copyright (c) 2026 Upside Down Labs - contact@upsidedownlabs.tech
+
+At Upside Down Labs, we create open-source DIY neuroscience hardware and software.
+Our mission is to make neuroscience affordable and accessible for everyone.
+By supporting us with your purchase, you help spread innovation and open science.
+Thank you for being part of this journey with us!
 """
 
 import sys
 import os
-import asyncio
-import threading
+
+# Essential for PyInstaller one-file mode so PySide CSS/UI can find relative asset paths like 'icons/*.svg'
+if hasattr(sys, '_MEIPASS'):
+    os.chdir(sys._MEIPASS)
 
 from PySide6.QtWidgets import (
-    QApplication, QInputDialog, QMessageBox, QButtonGroup, QDialog
+    QApplication, QInputDialog, QMessageBox, QButtonGroup, QDialog,
+    QScrollArea, QWidget, QVBoxLayout
 )
 from PySide6.QtUiTools import QUiLoader
-from PySide6.QtCore import QObject, Signal, QFile, QTimer
+from PySide6.QtCore import QFile, QTimer, Qt, qInstallMessageHandler
+from PySide6.QtGui import QIcon
 
-from ble_connection import NPGConnection, NPGDevice
+def qt_message_handler(mode, context, message):
+    # Ignore unfixable SVG and Font warnings from Qt
+    lower_msg = message.lower()
+    if "invalid path data" in lower_msg or "path truncated" in lower_msg:
+        return
+    if "setpointsize: point size <= 0" in lower_msg:
+        return
+    if "unknown property transition" in lower_msg:
+        return
+    sys.stderr.write(f"Qt: {message}\n")
+
+qInstallMessageHandler(qt_message_handler)
+
+from gamepad import resource_path, HAS_VGAMEPAD, SNES_TO_XUSB, ensure_vigembus
+from config import MAX_CHANNELS, FILTER_MAP, EMG_SCALE, BLINK_SCALE, EYE_SCALE, JAW_SCALE, ECG_SCALE, clamp100, DEFAULT_THRESHOLDS
+from ble_manager import BLEManager
+from channel_processor import ChannelProcessor
 from widgets.ThresholdBar import ThresholdBar
 from widgets.ControllerViewer import ControllerViewer
 
-try:
-    import vgamepad as vg
-    HAS_VGAMEPAD = True
-except ImportError:
-    HAS_VGAMEPAD = False
-    print("⚠️  vgamepad not installed — virtual gamepad output disabled")
-
-# Map SNES key names (from combo boxes) → vgamepad XUSB_BUTTON constants
-SNES_TO_XUSB = {}
 if HAS_VGAMEPAD:
-    SNES_TO_XUSB = {
-        "A":          vg.XUSB_BUTTON.XUSB_GAMEPAD_A,
-        "B":          vg.XUSB_BUTTON.XUSB_GAMEPAD_B,
-        "X":          vg.XUSB_BUTTON.XUSB_GAMEPAD_X,
-        "Y":          vg.XUSB_BUTTON.XUSB_GAMEPAD_Y,
-        "Dpad Up":    vg.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_UP,
-        "Dpad Down":  vg.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_DOWN,
-        "Dpad Left":  vg.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_LEFT,
-        "Dpad Right": vg.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_RIGHT,
-        "Start":      vg.XUSB_BUTTON.XUSB_GAMEPAD_START,
-        "L":          "LT", # Mapped conceptually, triggered as an axis
-        "R":          "RT", # Mapped conceptually, triggered as an axis
-    }
-
-# Filters
-from filters.BS50 import BS50
-from filters.BS60 import BS60
-from filters.HP70 import HP70
-from filters.HP5 import HP5
-from filters.LP45 import LP45
-from filters.BPECG import BPECG
-from filters.BP1To10 import BP1To10
-from filters.EnvelopeDetector import EnvelopeDetector
-from filters.BaselineTracker import BaselineTracker
-from filters.FFTBandpower import FFTBandpower
-
-MAX_CHANNELS = 6
-FILTER_MAP = {0: 'emg', 1: 'eeg', 2: 'eog', 3: 'ecg'}
-
-# Progress bar scaling (raw → 0-100)
-EMG_SCALE = 500.0
-BLINK_SCALE = 300.0
-EYE_SCALE = 300.0
-JAW_SCALE = 500.0
-ECG_SCALE = 500.0
+    import vgamepad as vg
 
 
-def clamp100(val, scale):
-    return max(0, min(100, int(val / scale * 100)))
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# BLE Manager — async BLE in a background thread, Qt signals for communication
-# ═══════════════════════════════════════════════════════════════════════════════
-
-class BLEManager(QObject):
-    scan_result         = Signal(list)
-    device_connected    = Signal(int)
-    device_disconnected = Signal()
-    data_received       = Signal(list, int)
-    battery_updated     = Signal(int)
-    error               = Signal(str)
-
-    def __init__(self):
-        super().__init__()
-        self._loop = asyncio.new_event_loop()
-        self._thread = threading.Thread(target=self._run_loop, daemon=True)
-        self._thread.start()
-        self._conn = None
-
-    def _run_loop(self):
-        asyncio.set_event_loop(self._loop)
-        self._loop.run_forever()
-
-    def start_scan(self):
-        asyncio.run_coroutine_threadsafe(self._scan(), self._loop)
-
-    def connect_to(self, device):
-        asyncio.run_coroutine_threadsafe(self._connect(device), self._loop)
-
-    def disconnect(self):
-        asyncio.run_coroutine_threadsafe(self._disconnect(), self._loop)
-
-    def shutdown(self):
-        try:
-            if self._conn:
-                asyncio.run_coroutine_threadsafe(
-                    self._disconnect(), self._loop
-                ).result(timeout=3)
-        except Exception:
-            pass
-        self._loop.call_soon_threadsafe(self._loop.stop)
-        self._thread.join(timeout=2)
-
-    async def _scan(self):
-        try:
-            devices = await NPGConnection.scan(timeout=10.0)
-            self.scan_result.emit(devices)
-        except Exception as e:
-            self.error.emit(f"Scan failed: {e}")
-
-    async def _connect(self, npg_device):
-        try:
-            self._conn = NPGConnection()
-            await self._conn.connect(npg_device)
-            self._conn.on_data(lambda s, n: self.data_received.emit(s, n))
-            self._conn.on_battery(lambda p: self.battery_updated.emit(p))
-            await self._conn.start_streaming()
-            self.device_connected.emit(self._conn.num_channels)
-        except Exception as e:
-            self._conn = None
-            self.error.emit(f"Connection failed: {e}")
-
-    async def _disconnect(self):
-        try:
-            if self._conn:
-                await self._conn.disconnect()
-                self._conn = None
-            self.device_disconnected.emit()
-        except Exception as e:
-            self.error.emit(f"Disconnect error: {e}")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Channel Processor — per-channel notch + signal filter chain
-# ═══════════════════════════════════════════════════════════════════════════════
-
-class ChannelProcessor:
-    def __init__(self):
-        self.notch = None
-        self.filter_type = 'emg'
-        self._init_emg()
-
-    # ── Pipeline initialisers ────────────────────────────────────────────
-
-    def _init_emg(self):
-        self.hp70 = HP70()
-        self.emg_env = EnvelopeDetector(64)
-        self.val_emg_envelope = 0.0
-
-    def _init_eeg(self):
-        self.lp45 = LP45()
-        self.hp5 = HP5()
-        self.fft = FFTBandpower(fft_size=512, sample_rate=500)
-        self.blink_env = EnvelopeDetector(50)
-        self.jaw_hp70 = HP70()
-        self.jaw_env = EnvelopeDetector(50)
-        self.val_beta_pct = 0.0
-        self.val_blink_envelope = 0.0
-        self.val_jaw_envelope = 0.0
-
-    def _init_eog(self):
-        self.bp1to10 = BP1To10()
-        self.baseline = BaselineTracker(256)
-        self.jaw_hp70 = HP70()
-        self.jaw_env = EnvelopeDetector(50)
-        self.val_eye_deviation = 0.0
-        self.val_jaw_envelope = 0.0
-
-    def _init_ecg(self):
-        self.ecg_filter = BPECG()
-        self.val_ecg = 0.0
-
-    # ── Configuration ────────────────────────────────────────────────────
-
-    def set_notch(self, setting):
-        if setting == '50':   self.notch = BS50()
-        elif setting == '60': self.notch = BS60()
-        else:                 self.notch = None
-
-    def set_filter(self, ftype):
-        self.filter_type = ftype
-        if ftype == 'emg':   self._init_emg()
-        elif ftype == 'eeg': self._init_eeg()
-        elif ftype == 'eog': self._init_eog()
-        elif ftype == 'ecg': self._init_ecg()
-
-    # ── Per-sample processing ────────────────────────────────────────────
-
-    def process(self, raw):
-        v = float(raw)
-        if self.notch:
-            v = self.notch.process(v)
-
-        if self.filter_type == 'emg':
-            f = self.hp70.process(v)
-            self.val_emg_envelope = self.emg_env.get_envelope(abs(f))
-
-        elif self.filter_type == 'eeg':
-            lp = self.lp45.process(v)
-            if self.fft.add_sample(lp):
-                self.val_beta_pct = self.fft.get_band_percentages()['beta']
-            hp = self.hp5.process(lp)
-            self.val_blink_envelope = self.blink_env.get_envelope(abs(hp))
-            j = self.jaw_hp70.process(v)
-            self.val_jaw_envelope = self.jaw_env.get_envelope(abs(j))
-
-        elif self.filter_type == 'eog':
-            bp = self.bp1to10.process(v)
-            self.baseline.update(bp)
-            self.val_eye_deviation = bp - self.baseline.get_baseline()
-            j = self.jaw_hp70.process(v)
-            self.val_jaw_envelope = self.jaw_env.get_envelope(abs(j))
-
-        elif self.filter_type == 'ecg':
-            f = self.ecg_filter.process(v)
-            self.val_ecg = abs(f)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # Controller Test Dialog
-# ═══════════════════════════════════════════════════════════════════════════════
 
 class ControllerTestDialog:
     def __init__(self, parent=None):
@@ -272,21 +97,23 @@ class ControllerTestDialog:
         self.viewer.update_button(action_name, value)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Main Controller — rewritten for the new UI layout
-# ═══════════════════════════════════════════════════════════════════════════════
+# Main
 
-class NPGController:
+class NPGLiteSNES:
     def __init__(self):
         self.app = QApplication(sys.argv)
+        self.app.setWindowIcon(QIcon(resource_path("icons/app_icon.png")))
 
         # Load UI
-        script_dir = os.path.dirname(os.path.abspath(__file__))
         loader = QUiLoader()
-        ui_file = QFile(os.path.join(script_dir, "NPG-Controller.ui"))
+        ui_file = QFile(resource_path("NPG-Controller.ui"))
         ui_file.open(QFile.ReadOnly)
         self.ui = loader.load(ui_file)
         ui_file.close()
+
+        # Make both panels scrollable so content never disappears
+        self._make_panel_scrollable(self.ui.configGroup)
+        self._make_panel_scrollable(self.ui.inputsGroup)
 
         # State
         self.num_channels = 0
@@ -296,10 +123,21 @@ class NPGController:
 
         # Virtual gamepad
         self.gamepad = None
-        self._pressed_buttons = set()  # currently pressed XUSB buttons
+        self._pressed_buttons = set()
+        self._detection_flash_keys = set()
 
         # Test Controller Window
         self.test_dialog = None
+
+        # Blink / Jaw Clench detectors
+        from Algorithms.BlinkDetector import BlinkDetector
+        from Algorithms.JawClenchDetector import JawClenchDetector
+        self.blink_detector = BlinkDetector()
+        self.jaw_detector = JawClenchDetector()
+        self.last_blink_event = None
+        self.last_jaw_event = None
+        self._blink_action_timer = 0
+        self._jaw_action_timer = 0
 
         # BLE
         self.ble = BLEManager()
@@ -314,33 +152,67 @@ class NPGController:
         self._init_button_groups()
         self._init_threshold_bars()
         self._init_keybindings()
+        self._fix_groupbox_styles()
         self._connect_signals()
         self._set_channel_enabled(0)
         # Uncheck "All" so it doesn't look selected at startup
         self.ui.btnSel_Input_All.setChecked(False)
+        # EMG combination dynamic rows: list of (lbl, bar, cmb, ch_a, ch_b)
+        self._emg_combo_rows = []
+
+        # Hide detection sub-rows initially
+        self.ui.grpDoubleBlink.setVisible(False)
+        self.ui.grpTripleBlink.setVisible(False)
+        self.ui.grpDoubleJawClench.setVisible(False)
         self._update_input_visibility()
 
-    # ── Threshold Bars ────────────────────────────────────────────────────────
+    # Scrollable panels
+
+    @staticmethod
+    def _make_panel_scrollable(group_box):
+        """Wrap a QGroupBox's content in a QScrollArea so it scrolls
+        instead of crushing/hiding widgets on small windows."""
+        old_layout = group_box.layout()
+        if old_layout is None:
+            return
+
+        # Create a container widget and move all existing items into it
+        container = QWidget()
+        new_layout = QVBoxLayout(container)
+        new_layout.setContentsMargins(
+            old_layout.contentsMargins().left(),
+            old_layout.contentsMargins().top(),
+            old_layout.contentsMargins().right(),
+            old_layout.contentsMargins().bottom(),
+        )
+        new_layout.setSpacing(old_layout.spacing())
+
+        while old_layout.count():
+            item = old_layout.takeAt(0)
+            if item.widget():
+                new_layout.addWidget(item.widget())
+            elif item.layout():
+                new_layout.addLayout(item.layout())
+            elif item.spacerItem():
+                new_layout.addItem(item.spacerItem())
+
+        # Create scroll area
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(container)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("QScrollArea{background:transparent;}"
+                             "QScrollArea>QWidget>QWidget{background:transparent;}")
+
+        # Put scroll area into the group box
+        old_layout.addWidget(scroll)
+
+    # Threshold Bars
 
     def _init_threshold_bars(self):
         """Replace QProgressBars with ThresholdBars (draggable threshold + green detect)."""
-        # Defaults derived from Arduino algo code:
-        #   Blink   = 50 / BLINK_SCALE(300) * 100 ≈ 17
-        #   Jaw     = 160 / JAW_SCALE(500) * 100  ≈ 32
-        #   Eye L/R = 150 / EYE_SCALE(300) * 100  ≈ 50
-        defaults = {
-            'pbFocus':    50,
-            'pbBlink':    17,
-            'pbLeftEye':  50,
-            'pbRightEye': 50,
-            'pbJaw':      32,
-            'pbECG':      50,
-            'pbEMG1':     40,
-            'pbEMG2':     40,
-            'pbEMG3':     40,
-            'pbEMG4':     40,
-        }
-        for name, thresh in defaults.items():
+        for name, thresh in DEFAULT_THRESHOLDS.items():
             old_pb = getattr(self.ui, name, None)
             if old_pb is None:
                 continue
@@ -386,16 +258,18 @@ class NPGController:
         cmb_list = [
             self.ui.cmbFocus, self.ui.cmbBlink, self.ui.cmbLeftEye, 
             self.ui.cmbRightEye, self.ui.cmbJaw, self.ui.cmbECG,
-            self.ui.cmbEMG1, self.ui.cmbEMG2, self.ui.cmbEMG3, self.ui.cmbEMG4
+            self.ui.cmbEMG1, self.ui.cmbEMG2, self.ui.cmbEMG3,
+            self.ui.cmbEMG4, self.ui.cmbEMG5, self.ui.cmbEMG6,
+            self.ui.cmbDoubleBlink, self.ui.cmbTripleBlink,
+            self.ui.cmbDoubleJawClench,
         ]
         
         for cmb in cmb_list:
             cmb.addItems(snes_keys)
 
-    # ── Button Groups ────────────────────────────────────────────────────────
+    # Button Groups
 
     def _init_button_groups(self):
-        # (Notch on/off is now a QCheckBox — no button group needed)
 
         # Notch frequency
         self.grp_notch_freq = QButtonGroup(self.ui)
@@ -423,7 +297,7 @@ class NPGController:
                 getattr(self.ui, f'btnSel_Input_Ch{ch}'), ch
             )
 
-    # ── Signal Wiring ────────────────────────────────────────────────────────
+    # Signal Wiring
 
     def _connect_signals(self):
         # Bottom bar
@@ -431,14 +305,14 @@ class NPGController:
         self.ui.btnKeybinds.clicked.connect(self._on_keybinds_clicked)
 
         # Notch
-        self.ui.chkNotch.stateChanged.connect(self._on_notch_toggle)
+        self.ui.grpNotch.toggled.connect(self._on_notch_toggle)
         self.grp_notch_freq.idClicked.connect(self._on_notch_freq)
 
         # Per-channel filter
         for i, g in enumerate(self.grp_filter_ch):
             g.idClicked.connect(lambda id_, ch=i: self._on_filter_ch(ch, id_))
 
-        # Per-channel checkbox (now QGroupBox)
+        # Per-channel checkbox 
         for i in range(MAX_CHANNELS):
             getattr(self.ui, f'grpCh{i + 1}').toggled.connect(
                 lambda state, ch=i: self._on_channel_toggled(ch, state)
@@ -461,7 +335,7 @@ class NPGController:
         self.ble.battery_updated.connect(self._on_battery)
         self.ble.error.connect(self._on_error)
 
-    # ── Channel Enable / Disable ─────────────────────────────────────────────
+    # Channel Enable / Disable
 
     def _set_channel_enabled(self, n):
         """Enable channels 1..n, disable n+1..6. All remain visible."""
@@ -469,7 +343,6 @@ class NPGController:
 
         # Notch section
         self.ui.grpNotch.setEnabled(any_active)
-        self._update_grp_title_style('grpNotch', any_active)
 
         # Input selector buttons
         self.ui.btnSel_Input_All.setEnabled(any_active)
@@ -479,11 +352,9 @@ class NPGController:
         for ch_idx in range(MAX_CHANNELS):
             ch = ch_idx + 1
             in_range = ch <= n
-            checked = (ch == 1) and in_range  # Only ch1 on by default
+            checked = (ch == 1) and in_range
 
-            # Disable entire group box for out-of-range (greys title too)
             getattr(self.ui, f'grpCh{ch}').setEnabled(in_range)
-            self._update_grp_title_style(f'grpCh{ch}', in_range)
 
             cb = getattr(self.ui, f'grpCh{ch}')
             cb.blockSignals(True)
@@ -493,6 +364,8 @@ class NPGController:
 
             self._set_channel_controls_enabled(ch_idx, checked)
 
+        self._update_filter_button_states()
+
     def _set_channel_controls_enabled(self, ch_idx, enabled):
         """Enable/disable filter buttons + icon for one channel. Reset on disable."""
         ch = ch_idx + 1
@@ -501,38 +374,124 @@ class NPGController:
         getattr(self.ui, f'btnChIcon{ch}').setEnabled(enabled)
 
         if not enabled:
-            # Reset to EMG (default)
             getattr(self.ui, f'btnFilterCh{ch}EMG').setChecked(True)
             self.processors[ch_idx].set_filter('emg')
             self.processors[ch_idx].set_notch('off')
 
-    def _update_grp_title_style(self, name, enabled):
-        """Update group box inline stylesheet so the title is white or grey."""
-        grp = getattr(self.ui, name)
-        c = '#ffffff' if enabled else '#333333'
-        # Rebuild inline stylesheet: base box style + title colours
-        base = grp.property('styleSheet') or ''
-        # Strip any previous ::title rule we injected
-        if '::title{' in base:
-            base = base[:base.index('::title{')] 
-            # also strip trailing '}'
-            base = base.rstrip('}')
-        # If base still has the original box style keep it, otherwise start fresh
-        if name.startswith('grpCh'):
-            box_style = (
-                f"QGroupBox#{name}{{background-color:transparent;"
-                f"border:1px solid #2a2a2a;border-radius:8px;"
-                f"margin-top:14px;padding:6px 8px;}}"
-            )
-        else:
-            box_style = ''
-        title_style = (
-            f"QGroupBox#{name}::title{{border:1px solid {c};color:{c};"
-            f"font-size:11px;padding:3px 8px;border-radius:5px;}}"
-        )
-        grp.setStyleSheet(box_style + title_style)
+    def _fix_groupbox_styles(self):
+        """Enforce badge-style titles and checkboxes on the channel groupboxes."""
+        
+        for i in range(1, 7):
+            grp = getattr(self.ui, f'grpCh{i}')
+            inline_css = f"""
+            QGroupBox#grpCh{i} {{
+                background-color: transparent;
+                border: 1px solid #ffffff;
+                border-radius: 8px;
+                margin-top: 14px;
+                margin-bottom: 6px;
+                padding-top: 14px; 
+                padding-bottom: 6px;
+                padding-left: 8px;
+                padding-right: 8px;
+            }}
+            QGroupBox#grpCh{i}:disabled, QGroupBox#grpCh{i}:unchecked {{
+                border: 1px solid #2a2a2a;
+            }}
+            QGroupBox#grpCh{i}::title {{
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                padding: 4px 8px;
+                left: 12px;
+                top: 0px;
+                background-color: #0a0a0a;
+                border: 1px solid #ffffff;
+                border-radius: 5px;
+                color: #ffffff;
+                font-size: 11px;
+            }}
+            QGroupBox#grpCh{i}::title:disabled, QGroupBox#grpCh{i}::title:unchecked {{
+                border: 1px solid #333333;
+                color: #333333;
+            }}
+            QGroupBox#grpCh{i}::indicator {{
+                width: 16px; 
+                height: 16px;
+                border-radius: 4px;
+                background-color: transparent;
+                border: 2px solid #3a3a3a;
+                margin-right: 6px;
+                margin-top: 1px;
+            }}
+            QGroupBox#grpCh{i}::indicator:checked {{
+                background-color: #0a0a0a;
+                border: 2px solid #ffffff;
+                image: url(icons/check.svg);
+            }}
+            QGroupBox#grpCh{i}::indicator:disabled, QGroupBox#grpCh{i}::indicator:unchecked {{
+                border: 2px solid #222222;
+                background-color: transparent;
+                image: none;
+            }}
+            """
+            grp.setStyleSheet(inline_css)
 
-    # ── Handlers: Connect / Disconnect ───────────────────────────────────────
+        # Style for Notch and detection sub-groupboxes (shared template)
+        def _badge_css(obj_name):
+            return f"""
+            QGroupBox#{obj_name} {{
+                background-color: transparent;
+                border: 1px solid #ffffff;
+                border-radius: 8px;
+                margin-top: 14px;
+                margin-bottom: 6px;
+                padding-top: 14px;
+                padding-bottom: 6px;
+                padding-left: 8px;
+                padding-right: 8px;
+            }}
+            QGroupBox#{obj_name}:disabled, QGroupBox#{obj_name}:unchecked {{
+                border: 1px solid #2a2a2a;
+            }}
+            QGroupBox#{obj_name}::title {{
+                background-color: #0a0a0a;
+                border: 1px solid #ffffff;
+                color: #ffffff;
+                font-size: 11px;
+                padding: 3px 8px;
+                border-radius: 5px;
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 12px;
+            }}
+            QGroupBox#{obj_name}::title:disabled, QGroupBox#{obj_name}::title:unchecked {{
+                border: 1px solid #333333;
+                color: #333333;
+            }}
+            QGroupBox#{obj_name}::indicator {{
+                width: 16px;
+                height: 16px;
+                border-radius: 4px;
+                background-color: transparent;
+                border: 2px solid #3a3a3a;
+                margin-right: 6px;
+                margin-top: 1px;
+            }}
+            QGroupBox#{obj_name}::indicator:checked {{
+                background-color: #0a0a0a;
+                border: 2px solid #ffffff;
+                image: url(icons/check.svg);
+            }}
+            QGroupBox#{obj_name}::indicator:disabled, QGroupBox#{obj_name}::indicator:unchecked {{
+                border: 2px solid #222222;
+                background-color: transparent;
+                image: none;
+            }}
+            """
+
+        self.ui.grpNotch.setStyleSheet(_badge_css('grpNotch'))
+
+    # Handlers: Connect / Disconnect
 
     def _on_connect_clicked(self):
         if self.ui.btnConnect.isChecked():
@@ -587,18 +546,33 @@ class NPGController:
             self.processors[ch].set_filter(FILTER_MAP.get(filter_id, 'emg'))
         self._apply_notch_to_all()
 
-        # Create virtual gamepad
+        # Create virtual gamepad (staggered attempts on main thread to avoid UI freeze)
         if HAS_VGAMEPAD and self.gamepad is None:
-            try:
-                self.gamepad = vg.VX360Gamepad()
-                print("🎮 Virtual gamepad created")
-            except Exception as e:
-                print(f"⚠️  Could not create gamepad: {e}")
-                self.gamepad = None
+            ensure_vigembus()
+            import gc
+
+            def _try_create_gamepad(attempt):
+                if not self.is_connected:
+                    return
+                try:
+                    self.gamepad = vg.VX360Gamepad()
+                    self.ui.statusbar.showMessage("Virtual gamepad connected", 4000)
+                    print("Virtual gamepad created")
+                except Exception as e:
+                    print(f"Gamepad attempt {attempt}/3 failed: {e}")
+                    self.gamepad = None
+                    gc.collect()
+                    if attempt < 3:
+                        QTimer.singleShot(1000, lambda: _try_create_gamepad(attempt + 1))
+                    else:
+                        self.ui.statusbar.showMessage("Failed to create virtual gamepad.", 6000)
+
+            _try_create_gamepad(1)
 
         # Select Ch1 in input selector and show its bars
         self.ui.btnSel_Input_Ch1.setChecked(True)
         self.selected_input = 1
+        self._rebuild_emg_combo_rows()
         self._update_input_visibility()
 
     def _on_disconnected(self):
@@ -611,23 +585,11 @@ class NPGController:
         self._set_channel_enabled(0)
         self._reset_progress_bars()
 
-        # Release all gamepad buttons and destroy
-        if self.gamepad:
-            try:
-                self.gamepad.reset()
-                self.gamepad.update()
-                del self.gamepad
-            except Exception:
-                pass
-            self.gamepad = None
-            self._pressed_buttons.clear()
-            print("🎮 Virtual gamepad released")
+        self._destroy_gamepad()
 
-        # Reset controller viewer
         if self.test_dialog:
             self.test_dialog.viewer.reset_all()
 
-        # Reset input selector to All
         self.ui.btnSel_Input_All.setChecked(True)
         self.selected_input = 0
         self._update_input_visibility()
@@ -647,10 +609,10 @@ class NPGController:
             self.test_dialog = ControllerTestDialog(self.ui)
         self.test_dialog.show()
 
-    # ── Handlers: Notch ──────────────────────────────────────────────────────
+    # Handlers: Notch
 
     def _on_notch_toggle(self, state):
-        notch_on = (state != 0)
+        notch_on = bool(state)
         self.ui.btnNotch50Hz.setEnabled(notch_on)
         self.ui.btnNotch60Hz.setEnabled(notch_on)
         self._apply_notch_to_all()
@@ -660,7 +622,7 @@ class NPGController:
 
     def _apply_notch_to_all(self):
         """Apply the global notch setting to all enabled+checked channels."""
-        if self.ui.chkNotch.isChecked():
+        if self.ui.grpNotch.isChecked():
             setting = '50' if self.ui.btnNotch50Hz.isChecked() else '60'
         else:
             setting = 'off'
@@ -669,10 +631,12 @@ class NPGController:
             if cb.isChecked():
                 self.processors[ch_idx].set_notch(setting)
 
-    # ── Handlers: Filter & Channel ───────────────────────────────────────────
+    # Handlers: Filter & Channel
 
     def _on_filter_ch(self, ch, id_):
         self.processors[ch].set_filter(FILTER_MAP.get(id_, 'emg'))
+        self._update_filter_button_states()
+        self._rebuild_emg_combo_rows()
         self._update_input_visibility()
 
     def _on_channel_toggled(self, ch_idx, state):
@@ -682,9 +646,132 @@ class NPGController:
             self._apply_notch_to_all()
             filter_id = self.grp_filter_ch[ch_idx].checkedId()
             self.processors[ch_idx].set_filter(FILTER_MAP.get(filter_id, 'emg'))
+        self._update_filter_button_states()
+        self._rebuild_emg_combo_rows()
         self._update_input_visibility()
 
-    # ── Signal Input Selector ────────────────────────────────────────────────
+    def _update_filter_button_states(self):
+        """Ensure EEG, EOG, and ECG can only be selected by one active channel at a time."""
+        active_filters = {}
+        
+        for ch_idx in range(MAX_CHANNELS):
+            cb = getattr(self.ui, f'grpCh{ch_idx + 1}')
+            if cb.isChecked():
+                filter_id = self.grp_filter_ch[ch_idx].checkedId()
+                if filter_id in (1, 2, 3):
+                    if filter_id in active_filters:
+                        getattr(self.ui, f'btnFilterCh{ch_idx + 1}EMG').setChecked(True)
+                        self.processors[ch_idx].set_filter('emg')
+                    else:
+                        active_filters[filter_id] = ch_idx
+        
+        for ch_idx in range(MAX_CHANNELS):
+            cb = getattr(self.ui, f'grpCh{ch_idx + 1}')
+            if not cb.isEnabled() or not cb.isChecked():
+                continue
+                
+            btn_eeg = getattr(self.ui, f'btnFilterCh{ch_idx + 1}EEG')
+            btn_eog = getattr(self.ui, f'btnFilterCh{ch_idx + 1}EOG')
+            btn_ecg = getattr(self.ui, f'btnFilterCh{ch_idx + 1}ECG')
+            
+            btn_eeg.setEnabled(1 not in active_filters or active_filters[1] == ch_idx)
+            btn_eog.setEnabled(2 not in active_filters or active_filters[2] == ch_idx)
+            btn_ecg.setEnabled(3 not in active_filters or active_filters[3] == ch_idx)
+
+    def _rebuild_emg_combo_rows(self):
+        """Destroy old combo rows and create new ones for every pair of active
+        EMG channels.  Each row is (QLabel, ThresholdBar, QComboBox, ch_a, ch_b)."""
+        from PySide6.QtWidgets import QLabel, QComboBox, QHBoxLayout
+        from itertools import combinations
+
+        parent_layout = self._find_layout_of_spacer('inputsSpacer')
+        if parent_layout is None:
+            return
+
+        if not hasattr(self, '_saved_combo_keys'):
+            self._saved_combo_keys = {}
+
+        if self._emg_combo_rows:
+            for lbl, bar, cmb, ch_a, ch_b in self._emg_combo_rows:
+                # Save previous combination keys
+                self._saved_combo_keys[(ch_a, ch_b)] = cmb.currentIndex()
+                for i in range(parent_layout.count() - 1, -1, -1):
+                    item = parent_layout.itemAt(i)
+                    sub = item.layout() if item else None
+                    if sub:
+                        for j in range(sub.count()):
+                            w = sub.itemAt(j).widget() if sub.itemAt(j) else None
+                            if w is lbl:
+                                parent_layout.takeAt(i)
+                                break
+                lbl.setParent(None)
+                lbl.deleteLater()
+                bar.setParent(None)
+                bar.deleteLater()
+                cmb.setParent(None)
+                cmb.deleteLater()
+            self._emg_combo_rows.clear()
+
+        active_emg = []
+        for ch in range(self.num_channels):
+            cb = getattr(self.ui, f'grpCh{ch + 1}')
+            if cb.isChecked() and self.processors[ch].filter_type == 'emg':
+                active_emg.append(ch + 1)
+
+        if len(active_emg) < 2:
+            return
+
+        snes_keys = [
+            "None", "A", "B", "X", "Y", "Dpad Up", "Dpad Down",
+            "Dpad Left", "Dpad Right", "L", "R", "Start"
+        ]
+
+        spacer_idx = None
+        for i in range(parent_layout.count()):
+            item = parent_layout.itemAt(i)
+            if item.spacerItem():
+                spacer_idx = i
+                break
+
+        if spacer_idx is None:
+            spacer_idx = parent_layout.count()
+
+        insert_at = spacer_idx
+
+        for ch_a, ch_b in combinations(active_emg, 2):
+            row_layout = QHBoxLayout()
+            row_layout.setSpacing(12)
+
+            lbl = QLabel(f' EMG(Ch{ch_a}+Ch{ch_b})')
+            lbl.setMinimumWidth(100)
+            lbl.setStyleSheet('background-color: transparent;')
+
+            bar = ThresholdBar(threshold=40)
+            bar.setObjectName(f'pbEMGCombo_{ch_a}_{ch_b}')
+
+            cmb = QComboBox()
+            cmb.setMinimumWidth(80)
+            cmb.addItems(snes_keys)
+            if (ch_a, ch_b) in self._saved_combo_keys:
+                cmb.setCurrentIndex(self._saved_combo_keys[(ch_a, ch_b)])
+
+            row_layout.addWidget(lbl)
+            row_layout.addWidget(bar)
+            row_layout.addWidget(cmb)
+
+            parent_layout.insertLayout(insert_at, row_layout)
+            insert_at += 1
+
+            self._emg_combo_rows.append((lbl, bar, cmb, ch_a, ch_b))
+
+    def _find_layout_of_spacer(self, spacer_name):
+        """Find the parent vertical QLayout that contains all signal input rows."""
+        parent_widget = self.ui.pbEMG6.parentWidget()
+        if parent_widget and parent_widget.layout():
+            return parent_widget.layout()
+        return None
+
+    # Signal Input Selector
 
     def _on_input_selection(self, id_):
         self.selected_input = id_
@@ -702,7 +789,6 @@ class NPGController:
         """Show/hide signal input rows based on the input selector."""
         sel = self.selected_input
 
-        # Fixed rows (non-EMG)
         fixed = {
             'focus':    (self.ui.lblFocus,    self.ui.pbFocus,    self.ui.cmbFocus),
             'blink':    (self.ui.lblBlink,    self.ui.pbBlink,    self.ui.cmbBlink),
@@ -716,9 +802,10 @@ class NPGController:
             (self.ui.lblEMG2, self.ui.pbEMG2, self.ui.cmbEMG2),
             (self.ui.lblEMG3, self.ui.pbEMG3, self.ui.cmbEMG3),
             (self.ui.lblEMG4, self.ui.pbEMG4, self.ui.cmbEMG4),
+            (self.ui.lblEMG5, self.ui.pbEMG5, self.ui.cmbEMG5),
+            (self.ui.lblEMG6, self.ui.pbEMG6, self.ui.cmbEMG6),
         ]
 
-        # Helper: hide everything
         def hide_all():
             for lbl, pb, cmb in fixed.values():
                 lbl.setVisible(False)
@@ -728,13 +815,21 @@ class NPGController:
                 lbl.setVisible(False)
                 pb.setVisible(False)
                 cmb.setVisible(False)
+            for lbl, bar, cmb, _, _ in self._emg_combo_rows:
+                lbl.setVisible(False)
+                bar.setVisible(False)
+                cmb.setVisible(False)
+            self.ui.grpDoubleBlink.setVisible(False)
+            self.ui.cmbDoubleBlink.setVisible(False)
+            self.ui.grpTripleBlink.setVisible(False)
+            self.ui.cmbTripleBlink.setVisible(False)
+            self.ui.grpDoubleJawClench.setVisible(False)
+            self.ui.cmbDoubleJawClench.setVisible(False)
 
-        # Not connected — hide everything
         if not self.is_connected:
             hide_all()
             return
 
-        # Collect active filter types + EMG channel list
         active_types = set()
         emg_chs = []
         for ch_idx in range(self.num_channels):
@@ -747,7 +842,6 @@ class NPGController:
                 emg_chs.append(ch_idx + 1)
 
         if sel == 0:
-            # "All" — only show rows whose filter type has an active channel
             has_eeg = 'eeg' in active_types
             has_eog = 'eog' in active_types
             has_ecg = 'ecg' in active_types
@@ -772,9 +866,17 @@ class NPGController:
             fixed['ecg'][1].setVisible(has_ecg)
             fixed['ecg'][2].setVisible(has_ecg)
 
+            self.ui.grpDoubleBlink.setVisible(has_eeg)
+            self.ui.cmbDoubleBlink.setVisible(has_eeg)
+            self.ui.grpTripleBlink.setVisible(has_eeg)
+            self.ui.cmbTripleBlink.setVisible(has_eeg)
+            self.ui.grpDoubleJawClench.setVisible(has_jaw)
+            self.ui.cmbDoubleJawClench.setVisible(has_jaw)
+
             for i, (lbl, pb, cmb) in enumerate(emg_slots):
-                if i < len(emg_chs):
-                    lbl.setText(f' EMG(Ch{emg_chs[i]})')
+                ch_num = i + 1
+                if ch_num in emg_chs:
+                    lbl.setText(f' EMG(Ch{ch_num})')
                     lbl.setVisible(True)
                     pb.setVisible(True)
                     cmb.setVisible(True)
@@ -782,9 +884,20 @@ class NPGController:
                     lbl.setVisible(False)
                     pb.setVisible(False)
                     cmb.setVisible(False)
+
+            for lbl, bar, cmb, ch_a, ch_b in self._emg_combo_rows:
+                vis = (ch_a in emg_chs) and (ch_b in emg_chs)
+                lbl.setVisible(vis)
+                bar.setVisible(vis)
+                cmb.setVisible(vis)
         else:
-            # Specific channel — only show if the channel is actually checked
             hide_all()
+            self.ui.grpDoubleBlink.setVisible(False)
+            self.ui.cmbDoubleBlink.setVisible(False)
+            self.ui.grpTripleBlink.setVisible(False)
+            self.ui.cmbTripleBlink.setVisible(False)
+            self.ui.grpDoubleJawClench.setVisible(False)
+            self.ui.cmbDoubleJawClench.setVisible(False)
             ch_idx = sel - 1
             if ch_idx < self.num_channels:
                 cb = getattr(self.ui, f'grpCh{sel}')
@@ -795,23 +908,36 @@ class NPGController:
                             fixed[k][0].setVisible(True)
                             fixed[k][1].setVisible(True)
                             fixed[k][2].setVisible(True)
+                        self.ui.grpDoubleBlink.setVisible(True)
+                        self.ui.cmbDoubleBlink.setVisible(True)
+                        self.ui.grpTripleBlink.setVisible(True)
+                        self.ui.cmbTripleBlink.setVisible(True)
+                        self.ui.grpDoubleJawClench.setVisible(True)
+                        self.ui.cmbDoubleJawClench.setVisible(True)
                     elif ftype == 'eog':
                         for k in ('leftEye', 'rightEye', 'jaw'):
                             fixed[k][0].setVisible(True)
                             fixed[k][1].setVisible(True)
                             fixed[k][2].setVisible(True)
+                        self.ui.grpDoubleJawClench.setVisible(True)
+                        self.ui.cmbDoubleJawClench.setVisible(True)
                     elif ftype == 'ecg':
                         fixed['ecg'][0].setVisible(True)
                         fixed['ecg'][1].setVisible(True)
                         fixed['ecg'][2].setVisible(True)
                     elif ftype == 'emg':
-                        lbl, pb, cmb = emg_slots[0]
+                        lbl, pb, cmb = emg_slots[ch_idx]
                         lbl.setText(f' EMG(Ch{sel})')
                         lbl.setVisible(True)
                         pb.setVisible(True)
                         cmb.setVisible(True)
+                        for lbl2, bar2, cmb2, ch_a, ch_b in self._emg_combo_rows:
+                            if sel == ch_a or sel == ch_b:
+                                lbl2.setVisible(True)
+                                bar2.setVisible(True)
+                                cmb2.setVisible(True)
 
-    # ── Data Processing ──────────────────────────────────────────────────────
+    # Data Processing
 
     def _on_data(self, samples, num_channels):
         if not self.is_connected:
@@ -831,10 +957,10 @@ class NPGController:
 
         focus_set = blink_set = jaw_set = ecg_set = False
         left_eye_set = right_eye_set = False
-        emg_bars = [self.ui.pbEMG1, self.ui.pbEMG2, self.ui.pbEMG3, self.ui.pbEMG4]
-        emg_idx = 0
+        emg_bars = [self.ui.pbEMG1, self.ui.pbEMG2, self.ui.pbEMG3,
+                    self.ui.pbEMG4, self.ui.pbEMG5, self.ui.pbEMG6]
+        emg_ch_envelopes = {}
 
-        # Determine which channel owns jaw clench (lowest EEG or EOG)
         jaw_owner = None
         for ch in range(self.num_channels):
             p = self.processors[ch]
@@ -874,9 +1000,8 @@ class NPGController:
                     jaw_set = True
 
             elif p.filter_type == 'emg':
-                if emg_idx < 4:
-                    emg_bars[emg_idx].setValue(clamp100(p.val_emg_envelope, EMG_SCALE))
-                    emg_idx += 1
+                emg_bars[ch].setValue(clamp100(p.val_emg_envelope, EMG_SCALE))
+                emg_ch_envelopes[ch + 1] = p.val_emg_envelope
 
             elif p.filter_type == 'ecg' and not ecg_set:
                 self.ui.pbECG.setValue(clamp100(p.val_ecg, ECG_SCALE))
@@ -888,16 +1013,25 @@ class NPGController:
         if not right_eye_set: self.ui.pbRightEye.setValue(0)
         if not jaw_set:       self.ui.pbJaw.setValue(0)
         if not ecg_set:       self.ui.pbECG.setValue(0)
-        for i in range(emg_idx, 4):
-            emg_bars[i].setValue(0)
+        for i in range(6):
+            if (i + 1) not in emg_ch_envelopes:
+                emg_bars[i].setValue(0)
 
-        # ── Detection → key mapping → gamepad ────────────────────────────
+        # EMG combination rows update
+        for lbl, bar, cmb, ch_a, ch_b in self._emg_combo_rows:
+            if not bar.isVisible():
+                continue
+            val_a = emg_ch_envelopes.get(ch_a, 0.0)
+            val_b = emg_ch_envelopes.get(ch_b, 0.0)
+            combined = val_a + val_b
+            bar.setValue(clamp100(combined, EMG_SCALE * 2))
+
+        self._process_blink_jaw_detection()
         self._process_key_mappings()
 
     def _process_key_mappings(self):
         """Check each ThresholdBar's detected state, read its combo box mapping,
         and press/release the corresponding gamepad button."""
-        # Pairs of (ThresholdBar, QComboBox)
         bar_cmb_pairs = [
             (self.ui.pbFocus,    self.ui.cmbFocus),
             (self.ui.pbBlink,    self.ui.cmbBlink),
@@ -909,9 +1043,12 @@ class NPGController:
             (self.ui.pbEMG2,     self.ui.cmbEMG2),
             (self.ui.pbEMG3,     self.ui.cmbEMG3),
             (self.ui.pbEMG4,     self.ui.cmbEMG4),
+            (self.ui.pbEMG5,     self.ui.cmbEMG5),
+            (self.ui.pbEMG6,     self.ui.cmbEMG6),
         ]
+        for lbl, bar, cmb, _, _ in self._emg_combo_rows:
+            bar_cmb_pairs.append((bar, cmb))
 
-        # Collect which SNES keys should be pressed this frame
         keys_to_press = set()
         for bar, cmb in bar_cmb_pairs:
             if not bar.isVisible():
@@ -922,9 +1059,9 @@ class NPGController:
             if bar.detected:
                 keys_to_press.add(key_name)
 
-        # Update virtual gamepad
+        keys_to_press.update(self._detection_flash_keys)
+
         if self.gamepad:
-            # Press newly detected keys
             for key_name in keys_to_press:
                 xusb = SNES_TO_XUSB.get(key_name)
                 if xusb == "LT":
@@ -939,7 +1076,6 @@ class NPGController:
                     self.gamepad.press_button(xusb)
                     self._pressed_buttons.add(xusb)
 
-            # Release keys that are no longer detected
             active_xusb = {SNES_TO_XUSB.get(k) for k in keys_to_press
                            if k in SNES_TO_XUSB}
             for xusb in list(self._pressed_buttons):
@@ -954,7 +1090,6 @@ class NPGController:
 
             self.gamepad.update()
 
-        # Update controller viewer in test dialog
         if self.test_dialog:
             all_keys = ["A", "B", "X", "Y", "Dpad Up", "Dpad Down",
                         "Dpad Left", "Dpad Right", "L", "R", "Start"]
@@ -966,21 +1101,95 @@ class NPGController:
         for bar in [self.ui.pbFocus, self.ui.pbBlink,
                     self.ui.pbLeftEye, self.ui.pbRightEye,
                     self.ui.pbJaw, self.ui.pbECG,
-                    self.ui.pbEMG1, self.ui.pbEMG2, self.ui.pbEMG3, self.ui.pbEMG4]:
+                    self.ui.pbEMG1, self.ui.pbEMG2, self.ui.pbEMG3,
+                    self.ui.pbEMG4, self.ui.pbEMG5, self.ui.pbEMG6]:
+            bar.setValue(0)
+        for _, bar, _, _, _ in self._emg_combo_rows:
             bar.setValue(0)
 
-    # ── Run ──────────────────────────────────────────────────────────────────
+    # Blink / Jaw multi-event detection
+
+    def _process_blink_jaw_detection(self):
+        """Feed latest envelope values into BlinkDetector / JawClenchDetector
+        and trigger gamepad actions for double/triple events."""
+        import time
+        now_ms = int(time.time() * 1000)
+
+        blink_thresh = (self.ui.pbBlink.threshold() / 100.0) * BLINK_SCALE
+        jaw_thresh = (self.ui.pbJaw.threshold() / 100.0) * JAW_SCALE
+        self.blink_detector.threshold = blink_thresh
+        self.jaw_detector.threshold = jaw_thresh
+
+        blink_sample = None
+        jaw_sample = None
+        for ch in range(self.num_channels):
+            p = self.processors[ch]
+            cb = getattr(self.ui, f'grpCh{ch + 1}')
+            if not cb.isChecked():
+                continue
+            if p.filter_type == 'eeg' and blink_sample is None:
+                blink_sample = p.val_blink_envelope
+                if jaw_sample is None:
+                    jaw_sample = p.val_jaw_envelope
+            elif p.filter_type == 'eog' and jaw_sample is None:
+                jaw_sample = p.val_jaw_envelope
+
+        if blink_sample is not None:
+            # Always process to maintain moving window state, then check if we should trigger
+            event = self.blink_detector.process(blink_sample, now_ms)
+            if event == 'double' and self.ui.grpDoubleBlink.isChecked():
+                self._trigger_detection_action(self.ui.cmbDoubleBlink)
+            elif event == 'triple' and self.ui.grpTripleBlink.isChecked():
+                self._trigger_detection_action(self.ui.cmbTripleBlink)
+
+        if jaw_sample is not None:
+            event = self.jaw_detector.process(jaw_sample, now_ms)
+            if event == 'double' and self.ui.grpDoubleJawClench.isChecked():
+                self._trigger_detection_action(self.ui.cmbDoubleJawClench)
+
+    def _trigger_detection_action(self, cmb):
+        """Register a detection event to press a gamepad button for 500ms."""
+        key_name = cmb.currentText()
+        if key_name == 'None':
+            return
+            
+        self._detection_flash_keys.add(key_name)
+        print(f"Triggered detection for '{key_name}'")
+
+        def _end_flash(k=key_name):
+            self._detection_flash_keys.discard(k)
+        QTimer.singleShot(500, _end_flash)
+
+    def _destroy_gamepad(self):
+        """Safely tear down the virtual gamepad and free the ViGEmBus slot."""
+        if self.gamepad is not None:
+            import gc
+            try:
+                self.gamepad.reset()
+                self.gamepad.update()
+            except Exception as e:
+                print(f"Warning: Virtual gamepad reset failed: {e}")
+            try:
+                del self.gamepad
+            except Exception as e:
+                print(f"Warning: Virtual gamepad deletion failed: {e}")
+            self.gamepad = None
+            self._pressed_buttons.clear()
+            gc.collect()
+            print("Virtual gamepad released")
 
     def run(self):
+        import atexit
+        atexit.register(self._destroy_gamepad)
         self.ui.show()
         try:
             return self.app.exec()
         finally:
+            self._destroy_gamepad()
             self.ble.shutdown()
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
-    controller = NPGController()
+    controller = NPGLiteSNES()
     sys.exit(controller.run())

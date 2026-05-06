@@ -46,15 +46,15 @@ class BlinkDetector:
 
     # ── main entry ───────────────────────────────────────────────────────
 
-    def process(self, filtered_sample, now_ms):
-        """Feed one sample (after LP45 → HP5) and the current time in ms.
+    def process(self, envelope_sample, now_ms):
+        """Feed the pre-calculated envelope sample and current time in ms.
 
         Returns
         -------
         str or None
             ``'single'``, ``'double'``, ``'triple'``, or ``None``.
         """
-        self._update_envelope(filtered_sample)
+        self.envelope = envelope_sample
         high = self.envelope > self.threshold
         event = None
 

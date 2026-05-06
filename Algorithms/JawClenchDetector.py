@@ -41,15 +41,15 @@ class JawClenchDetector:
 
     # ── main entry ───────────────────────────────────────────────────────
 
-    def process(self, hp70_sample, now_ms):
-        """Feed one HP70-filtered sample and current time in ms.
+    def process(self, envelope_sample, now_ms):
+        """Feed the pre-calculated envelope sample and current time in ms.
 
         Returns
         -------
         str or None
             ``'single'``, ``'double'``, or ``None``.
         """
-        self._update_envelope(abs(hp70_sample))
+        self.envelope = envelope_sample
 
         high = self.envelope > self.threshold
         low = self.envelope < self.release_threshold

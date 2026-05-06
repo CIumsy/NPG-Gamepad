@@ -13,7 +13,7 @@ from PySide6.QtGui import QPainter, QColor, QPen, QPolygonF
 class ThresholdBar(QWidget):
     thresholdChanged = Signal(int)   # new threshold (0-100)
 
-    # ── Palette ──────────────────────────────────────────────────────────
+    # Palette 
     _BG      = QColor('#1a1a1a')
     _BORDER  = QColor('#2a2a2a')
     _FILL    = QColor('#ffffff')
@@ -30,7 +30,7 @@ class ThresholdBar(QWidget):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.setCursor(Qt.PointingHandCursor)
 
-    # ── Public API (drop-in for QProgressBar) ────────────────────────────
+    # Public API (drop-in for QProgressBar) 
 
     def value(self):
         return self._value
@@ -53,7 +53,7 @@ class ThresholdBar(QWidget):
     def detected(self):
         return self._threshold > 0 and self._value >= self._threshold
 
-    # ── Painting ─────────────────────────────────────────────────────────
+    # Painting 
 
     def paintEvent(self, _event):
         p = QPainter(self)
@@ -78,8 +78,11 @@ class ThresholdBar(QWidget):
             p.drawRoundedRect(QRectF(m, m, fill_w, h - 2 * m), r - 1, r - 1)
 
         # 3. Threshold marker (orange vertical line + small triangle)
-        if 0 < self._threshold < 100:
+        if 0 <= self._threshold <= 100:
             tx = m + (w - 2 * m) * self._threshold / 100.0
+            # Visually clamp the marker so the triangle doesn't bleed out of the widget
+            tx = max(3.0, min(float(w - 3), tx))
+            
             # Vertical line
             p.setPen(QPen(self._MARKER, 2))
             p.drawLine(QPointF(tx, 2), QPointF(tx, h - 2))
@@ -95,7 +98,7 @@ class ThresholdBar(QWidget):
 
         p.end()
 
-    # ── Mouse interaction (drag threshold) ───────────────────────────────
+    # Mouse interaction (drag threshold) 
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
