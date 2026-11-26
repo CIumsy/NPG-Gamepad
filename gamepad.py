@@ -99,6 +99,9 @@ DS4_ANALOG_KEYS = {
     "RS Up", "RS Down", "RS Left", "RS Right",
 }
 
+# IMU stick choices (DualShock only) -> stick key prefix
+IMU_STICK_PREFIX = {"Left Stick": "LS", "Right Stick": "RS"}
+
 KEYS_FOR_MODE = {MODE_XBOX: XBOX_KEYS, MODE_DS4: DS4_KEYS}
 CONTROLLER_NAMES = {MODE_XBOX: "Xbox 360", MODE_DS4: "DualShock 4"}
 

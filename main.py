@@ -51,6 +51,7 @@ qInstallMessageHandler(qt_message_handler)
 from gamepad import (
     resource_path, HAS_VGAMEPAD, ensure_vigembus, create_pad,
     MODE_XBOX, MODE_DS4, KEYS_FOR_MODE, CONTROLLER_NAMES, DS4_ANALOG_KEYS,
+    IMU_STICK_PREFIX,
 )
 from config import MAX_CHANNELS, FILTER_MAP, EMG_SCALE, BLINK_SCALE, EYE_SCALE, JAW_SCALE, ECG_SCALE, clamp100, DEFAULT_THRESHOLDS
 from ble_manager import BLEManager
@@ -163,6 +164,8 @@ class NPGLiteSNES:
         self.imu = IMUProcessor()
         self.has_imu = False
         self.imu_dialog = None
+        self._signal_key_values = {}     # latest signal mappings (30 Hz), merged with the IMU stick
+        self._imu_stick_choice = {MODE_XBOX: "None", MODE_DS4: "None"}
 
         # Blink / Jaw Clench detectors
         from Algorithms.BlinkDetector import BlinkDetector
@@ -364,6 +367,8 @@ class NPGLiteSNES:
         self._detection_flash_keys.clear()
         for cmb in self._all_combos():
             self._fill_combo(cmb)
+        self._fill_imu_combo()
+        self._signal_key_values = {}
 
         # Swap the virtual controller live if we are connected
         self._destroy_gamepad()
@@ -377,6 +382,7 @@ class NPGLiteSNES:
         sel = self._mode_selections[self.controller_mode]
         for cmb in self._all_combos():
             sel[cmb.objectName()] = cmb.currentText()
+        self._imu_stick_choice[self.controller_mode] = self.cmb_imu.currentText()
 
     def _fill_combo(self, cmb):
         """Reload a combo with the current mode's keys and restore its
@@ -456,7 +462,7 @@ class NPGLiteSNES:
         self.ble.data_received.connect(self._on_data)
         self.ble.battery_updated.connect(self._on_battery)
         self.ble.imu_available.connect(self._on_imu_available)
-        self.ble.imu_received.connect(self.imu.process)
+        self.ble.imu_received.connect(self._on_imu_samples)
         self.ble.error.connect(self._on_error)
 
     # Channel Enable / Disable
@@ -700,6 +706,7 @@ class NPGLiteSNES:
             self.imu_dialog.close()
         self.imu.reset()
         self.has_imu = False
+        self._signal_key_values = {}
         self._update_imu_row()
 
         self.ui.btnSel_Input_All.setChecked(True)
@@ -733,17 +740,41 @@ class NPGLiteSNES:
         self.btn_imu_cal = QPushButton('CALIBRATE')
         self.btn_imu_cal.clicked.connect(self._on_imu_calibrate)
 
+        from PySide6.QtWidgets import QComboBox
+        self.cmb_imu = QComboBox()
+        self.cmb_imu.setObjectName('cmbIMU')
+        self.cmb_imu.setMinimumWidth(110)
+        self._fill_imu_combo()
+
         row = QHBoxLayout()
         row.setSpacing(12)
         row.addWidget(self.lbl_imu)
         row.addWidget(self.lbl_imu_status, 1)
         row.addWidget(self.btn_imu_cal)
-        self._imu_row_widgets = [self.lbl_imu, self.lbl_imu_status, self.btn_imu_cal]
+        row.addWidget(self.cmb_imu)
+        self._imu_row_widgets = [self.lbl_imu, self.lbl_imu_status, self.btn_imu_cal, self.cmb_imu]
 
         # After the spacer, so it stays at the bottom of the panel
         parent_layout = self._find_layout_of_spacer('inputsSpacer')
         parent_layout.addLayout(row)
         self._update_imu_row()
+
+    def _fill_imu_combo(self):
+        """IMU can only drive an analog stick, so it's DualShock-only."""
+        cmb = self.cmb_imu
+        cmb.blockSignals(True)
+        cmb.clear()
+        if self.controller_mode == MODE_DS4:
+            cmb.addItems(["None"] + list(IMU_STICK_PREFIX))
+            idx = cmb.findText(self._imu_stick_choice[MODE_DS4])
+            cmb.setCurrentIndex(max(0, idx))
+            cmb.setEnabled(True)
+            cmb.setToolTip("Analog stick driven by the IMU tilt")
+        else:
+            cmb.addItem("None")
+            cmb.setEnabled(False)
+            cmb.setToolTip("The IMU can only drive an analog stick (DualShock mode)")
+        cmb.blockSignals(False)
 
     def _on_imu_available(self, available):
         self.has_imu = available
@@ -1227,11 +1258,40 @@ class NPGLiteSNES:
         for key_name in self._detection_flash_keys:
             key_values[key_name] = 1.0
 
+        self._signal_key_values = key_values
+        self._send_outputs()
+
+    def _send_outputs(self):
+        """Merge the latest signal mappings with the IMU stick and send them to the
+        gamepad and tester. Runs at 30 Hz for signals and on every IMU packet."""
+        key_values = dict(self._signal_key_values)
+        for key_name, val in self._imu_key_values().items():
+            key_values[key_name] = max(key_values.get(key_name, 0.0), val)
+
         if self.gamepad:
             self.gamepad.apply(key_values)
 
         if self.test_dialog:
             self.test_dialog.update_values(key_values)
+
+    def _imu_key_values(self):
+        """IMU stick as stick-direction key values, e.g. {'LS Left': 0.4, 'LS Up': 0.7}."""
+        if self.controller_mode != MODE_DS4 or not self.imu.calibrated:
+            return {}
+        prefix = IMU_STICK_PREFIX.get(self.cmb_imu.currentText())
+        if prefix is None:
+            return {}
+        x, y = self.imu.stick
+        return {
+            f"{prefix} Right": max(0.0, x), f"{prefix} Left": max(0.0, -x),
+            f"{prefix} Up": max(0.0, y), f"{prefix} Down": max(0.0, -y),
+        }
+
+    def _on_imu_samples(self, samples):
+        self.imu.process(samples)
+        # Push the stick straight away instead of waiting for the 30 Hz tick
+        if self.is_connected and self._imu_key_values():
+            self._send_outputs()
 
     @staticmethod
     def _analog_value(bar):

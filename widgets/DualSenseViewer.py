@@ -69,7 +69,7 @@ class DualSenseViewer(QWidget):
     ]
 
     # Fraction of the remaining distance the display moves each frame
-    _SMOOTHING = 0.35
+    _SMOOTHING = 0.6
 
     def __init__(self, parent=None):
         super().__init__(parent)
