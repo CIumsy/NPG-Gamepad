@@ -57,6 +57,7 @@ from ble_manager import BLEManager
 from channel_processor import ChannelProcessor
 from widgets.ThresholdBar import ThresholdBar
 from widgets.ControllerViewer import ControllerViewer
+from widgets.DualSenseViewer import DualSenseViewer
 
 
 # Controller Test Dialog
@@ -82,8 +83,18 @@ class ControllerTestDialog:
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(16)
 
-        self.viewer = ControllerViewer()
-        layout.addWidget(self.viewer, 1)
+        # One viewer per controller mode
+        from PySide6.QtWidgets import QStackedWidget
+        self._viewers = {
+            MODE_XBOX: ControllerViewer(),
+            MODE_DS4: DualSenseViewer(),
+        }
+        self._stack = QStackedWidget()
+        for v in self._viewers.values():
+            self._stack.addWidget(v)
+        layout.addWidget(self._stack, 1)
+        self.mode = MODE_XBOX
+        self.viewer = self._viewers[MODE_XBOX]
 
         btn_close = QPushButton("CLOSE TESTER")
         btn_close.setFixedHeight(44)
@@ -93,8 +104,21 @@ class ControllerTestDialog:
     def show(self):
         self.dialog.show()
 
-    def update_input(self, action_name, value):
-        self.viewer.update_button(action_name, value)
+    def set_mode(self, mode):
+        """Show the controller drawing for the given mode."""
+        self.mode = mode
+        self.viewer = self._viewers[mode]
+        self._stack.setCurrentWidget(self.viewer)
+        for v in self._viewers.values():
+            v.reset_all()
+
+    def update_values(self, key_values):
+        """key_values: {key name: 0..1} for the current mode."""
+        if self.mode == MODE_DS4:
+            self.viewer.set_values(key_values)
+        else:
+            for key_name in KEYS_FOR_MODE[MODE_XBOX]:
+                self.viewer.update_button(key_name, key_values.get(key_name, 0.0) > 0)
 
 
 # Main
@@ -338,7 +362,7 @@ class NPGLiteSNES:
             self._create_gamepad()
 
         if self.test_dialog:
-            self.test_dialog.viewer.reset_all()
+            self.test_dialog.set_mode(new_mode)
 
     def _save_mode_selections(self):
         sel = self._mode_selections[self.controller_mode]
@@ -678,6 +702,7 @@ class NPGLiteSNES:
     def _on_keybinds_clicked(self):
         if not self.test_dialog:
             self.test_dialog = ControllerTestDialog(self.ui)
+            self.test_dialog.set_mode(self.controller_mode)
         self.test_dialog.show()
 
     # Handlers: Notch
@@ -1133,9 +1158,7 @@ class NPGLiteSNES:
             self.gamepad.apply(key_values)
 
         if self.test_dialog:
-            for key_name in KEYS_FOR_MODE[self.controller_mode]:
-                self.test_dialog.viewer.update_button(
-                    key_name, key_values.get(key_name, 0.0) > 0)
+            self.test_dialog.update_values(key_values)
 
     @staticmethod
     def _analog_value(bar):
