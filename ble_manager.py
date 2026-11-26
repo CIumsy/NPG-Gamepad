@@ -14,6 +14,8 @@ class BLEManager(QObject):
     device_disconnected = Signal()
     data_received       = Signal(list, int)
     battery_updated     = Signal(int)
+    imu_available       = Signal(bool)   # emitted just before device_connected
+    imu_received        = Signal(list)
     error               = Signal(str)
 
     def __init__(self):
@@ -60,7 +62,9 @@ class BLEManager(QObject):
             await self._conn.connect(npg_device)
             self._conn.on_data(lambda s, n: self.data_received.emit(s, n))
             self._conn.on_battery(lambda p: self.battery_updated.emit(p))
+            self._conn.on_imu(lambda s: self.imu_received.emit(s))
             await self._conn.start_streaming()
+            self.imu_available.emit(self._conn.has_imu)
             self.device_connected.emit(self._conn.num_channels)
         except Exception as e:
             self._conn = None

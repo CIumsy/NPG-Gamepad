@@ -58,6 +58,8 @@ from channel_processor import ChannelProcessor
 from widgets.ThresholdBar import ThresholdBar
 from widgets.ControllerViewer import ControllerViewer
 from widgets.DualSenseViewer import DualSenseViewer
+from widgets.IMUCalibrationDialog import IMUCalibrationDialog
+from Algorithms.IMUProcessor import IMUProcessor
 
 
 # Controller Test Dialog
@@ -157,6 +159,11 @@ class NPGLiteSNES:
         # Test Controller Window
         self.test_dialog = None
 
+        # IMU (MPU6050) motion -> analog stick
+        self.imu = IMUProcessor()
+        self.has_imu = False
+        self.imu_dialog = None
+
         # Blink / Jaw Clench detectors
         from Algorithms.BlinkDetector import BlinkDetector
         from Algorithms.JawClenchDetector import JawClenchDetector
@@ -188,6 +195,8 @@ class NPGLiteSNES:
         self.ui.btnSel_Input_All.setChecked(False)
         # EMG combination dynamic rows: list of (lbl, bar, cmb, ch_a, ch_b)
         self._emg_combo_rows = []
+
+        self._init_imu_row()
 
         # Hide detection sub-rows initially
         self.ui.grpDoubleBlink.setVisible(False)
@@ -446,6 +455,8 @@ class NPGLiteSNES:
         self.ble.device_disconnected.connect(self._on_disconnected)
         self.ble.data_received.connect(self._on_data)
         self.ble.battery_updated.connect(self._on_battery)
+        self.ble.imu_available.connect(self._on_imu_available)
+        self.ble.imu_received.connect(self.imu.process)
         self.ble.error.connect(self._on_error)
 
     # Channel Enable / Disable
@@ -685,6 +696,12 @@ class NPGLiteSNES:
         if self.test_dialog:
             self.test_dialog.viewer.reset_all()
 
+        if self.imu_dialog:
+            self.imu_dialog.close()
+        self.imu.reset()
+        self.has_imu = False
+        self._update_imu_row()
+
         self.ui.btnSel_Input_All.setChecked(True)
         self.selected_input = 0
         self._update_input_visibility()
@@ -698,6 +715,61 @@ class NPGLiteSNES:
 
     def _on_battery(self, pct):
         self.ui.statusbar.showMessage(f"Battery: {pct}%", 3000)
+
+    # IMU
+
+    def _init_imu_row(self):
+        """IMU row pinned to the bottom of Signal Inputs (shown when the firmware has the IMU stream)."""
+        from PySide6.QtWidgets import QLabel, QPushButton, QHBoxLayout
+
+        self.lbl_imu = QLabel(' IMU')
+        self.lbl_imu.setMinimumWidth(100)
+        self.lbl_imu.setStyleSheet('background-color: transparent;')
+
+        self.lbl_imu_status = QLabel()
+        self.lbl_imu_status.setStyleSheet(
+            'background-color: transparent; color: #9a9a9a; font-size: 12px;')
+
+        self.btn_imu_cal = QPushButton('CALIBRATE')
+        self.btn_imu_cal.clicked.connect(self._on_imu_calibrate)
+
+        row = QHBoxLayout()
+        row.setSpacing(12)
+        row.addWidget(self.lbl_imu)
+        row.addWidget(self.lbl_imu_status, 1)
+        row.addWidget(self.btn_imu_cal)
+        self._imu_row_widgets = [self.lbl_imu, self.lbl_imu_status, self.btn_imu_cal]
+
+        # After the spacer, so it stays at the bottom of the panel
+        parent_layout = self._find_layout_of_spacer('inputsSpacer')
+        parent_layout.addLayout(row)
+        self._update_imu_row()
+
+    def _on_imu_available(self, available):
+        self.has_imu = available
+        self._update_imu_row()
+
+    def _on_imu_calibrate(self):
+        if not self.imu_dialog:
+            self.imu_dialog = IMUCalibrationDialog(self.imu, self.ui)
+        self.imu_dialog.show()
+
+    def _update_imu_row(self):
+        visible = self.is_connected and self.has_imu
+        for w in self._imu_row_widgets:
+            w.setVisible(visible)
+        if not visible:
+            return
+        if not self.imu.receiving:
+            text = 'No data (is the MPU6050 connected?)'
+        elif self.imu.calibrator is not None:
+            text = 'Calibrating...'
+        elif self.imu.calibrated:
+            text = 'Calibrated'
+        else:
+            text = 'Not calibrated'
+        if self.lbl_imu_status.text() != text:
+            self.lbl_imu_status.setText(text)
 
     def _on_keybinds_clicked(self):
         if not self.test_dialog:
@@ -1115,6 +1187,7 @@ class NPGLiteSNES:
 
         self._process_blink_jaw_detection()
         self._process_key_mappings()
+        self._update_imu_row()
 
     def _process_key_mappings(self):
         """Check each ThresholdBar's detected state, read its combo box mapping,

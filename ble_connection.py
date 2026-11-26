@@ -25,11 +25,13 @@ from npg_protocol import (
     DATA_CHAR_UUID,
     CONTROL_CHAR_UUID,
     BATTERY_CHAR_UUID,
+    IMU_CHAR_UUID,
     CMD_START,
     CMD_STOP,
     SAMPLE_RATE,
     detect_channels_from_name,
     parse_packet,
+    parse_imu_packet,
 )
 
 
@@ -62,10 +64,12 @@ class NPGConnection:
         self.num_channels: int | None = None
         self.is_streaming: bool = False
         self.sample_count: int = 0
+        self.has_imu: bool = False
         self._data_callback = None
         self._battery_callback = None
+        self._imu_callback = None
 
-    # Scanning 
+    # Scanning
 
     @staticmethod
     async def scan(timeout: float = 10.0) -> list[NPGDevice]:
@@ -143,8 +147,9 @@ class NPGConnection:
         self.num_channels = None
         self.is_streaming = False
         self.sample_count = 0
+        self.has_imu = False
 
-    # Callbacks 
+    # Callbacks
 
     def on_data(self, callback) -> None:
         """
@@ -163,7 +168,15 @@ class NPGConnection:
         """
         self._battery_callback = callback
 
-    # Streaming 
+    def on_imu(self, callback) -> None:
+        """
+        Register a callback for IMU samples (firmware with the MPU6050 stream).
+
+        callback(samples: list[tuple])   # (counter, ax, ay, az, gx, gy, gz) raw
+        """
+        self._imu_callback = callback
+
+    # Streaming
 
     async def start_streaming(self) -> None:
         """
@@ -182,6 +195,15 @@ class NPGConnection:
             await self.client.start_notify(BATTERY_CHAR_UUID, self._on_battery_notification)
         except Exception:
             print("Battery characteristic not available on this device")
+
+        # Subscribe to IMU notifications (only firmware with the MPU6050 stream has it)
+        try:
+            await self.client.start_notify(IMU_CHAR_UUID, self._on_imu_notification)
+            self.has_imu = True
+            print("IMU stream available")
+        except Exception:
+            self.has_imu = False
+            print("IMU characteristic not available on this device")
 
         # Send START command
         await self.client.write_gatt_char(CONTROL_CHAR_UUID, CMD_START)
@@ -210,6 +232,11 @@ class NPGConnection:
             await self.client.stop_notify(BATTERY_CHAR_UUID)
         except Exception:
             pass
+        if self.has_imu:
+            try:
+                await self.client.stop_notify(IMU_CHAR_UUID)
+            except Exception:
+                pass
 
         self.is_streaming = False
         print("Streaming stopped")
@@ -228,6 +255,13 @@ class NPGConnection:
         """Handle incoming battery notifications from BATTERY_CHAR_UUID."""
         if len(data) >= 1 and self._battery_callback:
             self._battery_callback(data[0])
+
+    def _on_imu_notification(self, _sender, data: bytearray) -> None:
+        """Handle incoming IMU notifications from IMU_CHAR_UUID."""
+        if self._imu_callback:
+            samples = parse_imu_packet(bytes(data))
+            if samples:
+                self._imu_callback(samples)
 
 
 # Standalone CLI for testing 
