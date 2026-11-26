@@ -50,7 +50,7 @@ qInstallMessageHandler(qt_message_handler)
 
 from gamepad import (
     resource_path, HAS_VGAMEPAD, ensure_vigembus, create_pad,
-    MODE_XBOX, MODE_DS4, KEYS_FOR_MODE, CONTROLLER_NAMES,
+    MODE_XBOX, MODE_DS4, KEYS_FOR_MODE, CONTROLLER_NAMES, DS4_ANALOG_KEYS,
 )
 from config import MAX_CHANNELS, FILTER_MAP, EMG_SCALE, BLINK_SCALE, EYE_SCALE, JAW_SCALE, ECG_SCALE, clamp100, DEFAULT_THRESHOLDS
 from ble_manager import BLEManager
@@ -1119,7 +1119,10 @@ class NPGLiteSNES:
             key_name = cmb.currentText()
             if key_name == "None":
                 continue
-            val = 1.0 if bar.detected else 0.0
+            if self.controller_mode == MODE_DS4 and key_name in DS4_ANALOG_KEYS:
+                val = self._analog_value(bar)
+            else:
+                val = 1.0 if bar.detected else 0.0
             key_values[key_name] = max(key_values.get(key_name, 0.0), val)
 
         # Double/triple blink and double jaw clench: full press for the flash time
@@ -1133,6 +1136,17 @@ class NPGLiteSNES:
             for key_name in KEYS_FOR_MODE[self.controller_mode]:
                 self.test_dialog.viewer.update_button(
                     key_name, key_values.get(key_name, 0.0) > 0)
+
+    @staticmethod
+    def _analog_value(bar):
+        """Map a bar onto 0..1 for an analog control. The range is the
+        threshold +/- 50%: threshold 40 -> 20 is 0.0 and 60 is 1.0."""
+        thresh = bar.threshold()
+        if thresh <= 0:
+            return 0.0      # threshold 0 disables the signal, same as for buttons
+        low = thresh * 0.5
+        high = min(100.0, thresh * 1.5)
+        return max(0.0, min(1.0, (bar.value() - low) / (high - low)))
 
     def _reset_progress_bars(self):
         for bar in [self.ui.pbFocus, self.ui.pbBlink,
