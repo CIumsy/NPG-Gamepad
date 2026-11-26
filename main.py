@@ -48,15 +48,15 @@ def qt_message_handler(mode, context, message):
 
 qInstallMessageHandler(qt_message_handler)
 
-from gamepad import resource_path, HAS_VGAMEPAD, SNES_TO_XUSB, ensure_vigembus
+from gamepad import (
+    resource_path, HAS_VGAMEPAD, ensure_vigembus, create_pad,
+    MODE_XBOX, MODE_DS4, KEYS_FOR_MODE, CONTROLLER_NAMES,
+)
 from config import MAX_CHANNELS, FILTER_MAP, EMG_SCALE, BLINK_SCALE, EYE_SCALE, JAW_SCALE, ECG_SCALE, clamp100, DEFAULT_THRESHOLDS
 from ble_manager import BLEManager
 from channel_processor import ChannelProcessor
 from widgets.ThresholdBar import ThresholdBar
 from widgets.ControllerViewer import ControllerViewer
-
-if HAS_VGAMEPAD:
-    import vgamepad as vg
 
 
 # Controller Test Dialog
@@ -123,8 +123,12 @@ class NPGLiteSNES:
 
         # Virtual gamepad
         self.gamepad = None
-        self._pressed_buttons = set()
+        self._gamepad_gen = 0   # bumps on every create/destroy to cancel stale retries
         self._detection_flash_keys = set()
+
+        # Controller mode (Xbox / DualShock). Each mode keeps its own key mappings.
+        self.controller_mode = MODE_XBOX
+        self._mode_selections = {MODE_XBOX: {}, MODE_DS4: {}}
 
         # Test Controller Window
         self.test_dialog = None
@@ -149,6 +153,7 @@ class NPGLiteSNES:
         self._ui_timer.start()
 
         # Setup
+        self._init_mode_tabs()
         self._init_button_groups()
         self._init_threshold_bars()
         self._init_keybindings()
@@ -248,24 +253,108 @@ class NPGLiteSNES:
                     return r
         return None
 
-    def _init_keybindings(self):
-        """Populate combo boxes with SNES controller keys."""
-        snes_keys = [
-            "None", "A", "B", "X", "Y", "Dpad Up", "Dpad Down", 
-            "Dpad Left", "Dpad Right", "L", "R", "Start"
-        ]
-        
-        cmb_list = [
-            self.ui.cmbFocus, self.ui.cmbBlink, self.ui.cmbLeftEye, 
+    def _key_list(self):
+        """Drop-down entries for the current controller mode."""
+        return ["None"] + KEYS_FOR_MODE[self.controller_mode]
+
+    def _static_combos(self):
+        """Key mapping combo boxes defined in the .ui file."""
+        return [
+            self.ui.cmbFocus, self.ui.cmbBlink, self.ui.cmbLeftEye,
             self.ui.cmbRightEye, self.ui.cmbJaw, self.ui.cmbECG,
             self.ui.cmbEMG1, self.ui.cmbEMG2, self.ui.cmbEMG3,
             self.ui.cmbEMG4, self.ui.cmbEMG5, self.ui.cmbEMG6,
             self.ui.cmbDoubleBlink, self.ui.cmbTripleBlink,
             self.ui.cmbDoubleJawClench,
         ]
-        
-        for cmb in cmb_list:
-            cmb.addItems(snes_keys)
+
+    def _all_combos(self):
+        """Static combos plus the dynamic EMG combination combos."""
+        return self._static_combos() + [row[2] for row in self._emg_combo_rows]
+
+    def _init_keybindings(self):
+        """Populate combo boxes with the current mode's controller keys."""
+        for cmb in self._static_combos():
+            cmb.addItems(self._key_list())
+
+    # Controller Mode Tabs
+
+    def _init_mode_tabs(self):
+        """Add the Xbox / DualShock tabs above the main content."""
+        from PySide6.QtWidgets import QTabBar, QHBoxLayout
+
+        self.mode_tabs = QTabBar()
+        self.mode_tabs.setObjectName("modeTabs")
+        self.mode_tabs.setDrawBase(False)
+        self.mode_tabs.setExpanding(False)
+        self.mode_tabs.addTab("XBOX")
+        self.mode_tabs.addTab("DUALSHOCK")
+        self.mode_tabs.setStyleSheet("""
+            QTabBar#modeTabs { background: transparent; }
+            QTabBar#modeTabs::tab {
+                background-color: #141414;
+                border: 1px solid #3a3a3a;
+                border-radius: 6px;
+                color: #e8e8e8;
+                font-size: 13px;
+                font-weight: 900;
+                letter-spacing: 2px;
+                padding: 8px 28px;
+                margin-right: 8px;
+            }
+            QTabBar#modeTabs::tab:hover:!selected {
+                border: 1px solid #ffffff;
+                color: #ffffff;
+            }
+            QTabBar#modeTabs::tab:selected {
+                background-color: #ffffff;
+                border: 1px solid #ffffff;
+                color: #000000;
+            }
+        """)
+        self.mode_tabs.currentChanged.connect(self._on_mode_changed)
+
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(self.mode_tabs)
+        row.addStretch(1)
+        self.ui.centralwidget.layout().insertLayout(0, row)
+
+    def _on_mode_changed(self, index):
+        new_mode = MODE_DS4 if index == 1 else MODE_XBOX
+        if new_mode == self.controller_mode:
+            return
+
+        # Remember this mode's mappings, then swap every drop-down's key list
+        self._save_mode_selections()
+        self.controller_mode = new_mode
+        self._detection_flash_keys.clear()
+        for cmb in self._all_combos():
+            self._fill_combo(cmb)
+
+        # Swap the virtual controller live if we are connected
+        self._destroy_gamepad()
+        if self.is_connected:
+            self._create_gamepad()
+
+        if self.test_dialog:
+            self.test_dialog.viewer.reset_all()
+
+    def _save_mode_selections(self):
+        sel = self._mode_selections[self.controller_mode]
+        for cmb in self._all_combos():
+            sel[cmb.objectName()] = cmb.currentText()
+
+    def _fill_combo(self, cmb):
+        """Reload a combo with the current mode's keys and restore its
+        saved choice for this mode (or None)."""
+        saved = self._mode_selections[self.controller_mode].get(cmb.objectName(), "None")
+        cmb.blockSignals(True)
+        cmb.clear()
+        cmb.addItems(self._key_list())
+        idx = cmb.findText(saved)
+        cmb.setCurrentIndex(idx if idx >= 0 else 0)
+        cmb.blockSignals(False)
 
     # Button Groups
 
@@ -546,28 +635,10 @@ class NPGLiteSNES:
             self.processors[ch].set_filter(FILTER_MAP.get(filter_id, 'emg'))
         self._apply_notch_to_all()
 
-        # Create virtual gamepad (staggered attempts on main thread to avoid UI freeze)
+        # Create virtual gamepad for the selected mode
         if HAS_VGAMEPAD and self.gamepad is None:
             ensure_vigembus()
-            import gc
-
-            def _try_create_gamepad(attempt):
-                if not self.is_connected:
-                    return
-                try:
-                    self.gamepad = vg.VX360Gamepad()
-                    self.ui.statusbar.showMessage("Virtual gamepad connected", 4000)
-                    print("Virtual gamepad created")
-                except Exception as e:
-                    print(f"Gamepad attempt {attempt}/3 failed: {e}")
-                    self.gamepad = None
-                    gc.collect()
-                    if attempt < 3:
-                        QTimer.singleShot(1000, lambda: _try_create_gamepad(attempt + 1))
-                    else:
-                        self.ui.statusbar.showMessage("Failed to create virtual gamepad.", 6000)
-
-            _try_create_gamepad(1)
+            self._create_gamepad()
 
         # Select Ch1 in input selector and show its bars
         self.ui.btnSel_Input_Ch1.setChecked(True)
@@ -688,13 +759,10 @@ class NPGLiteSNES:
         if parent_layout is None:
             return
 
-        if not hasattr(self, '_saved_combo_keys'):
-            self._saved_combo_keys = {}
-
         if self._emg_combo_rows:
             for lbl, bar, cmb, ch_a, ch_b in self._emg_combo_rows:
-                # Save previous combination keys
-                self._saved_combo_keys[(ch_a, ch_b)] = cmb.currentIndex()
+                # Save previous combination keys (per controller mode)
+                self._mode_selections[self.controller_mode][cmb.objectName()] = cmb.currentText()
                 for i in range(parent_layout.count() - 1, -1, -1):
                     item = parent_layout.itemAt(i)
                     sub = item.layout() if item else None
@@ -721,11 +789,6 @@ class NPGLiteSNES:
         if len(active_emg) < 2:
             return
 
-        snes_keys = [
-            "None", "A", "B", "X", "Y", "Dpad Up", "Dpad Down",
-            "Dpad Left", "Dpad Right", "L", "R", "Start"
-        ]
-
         spacer_idx = None
         for i in range(parent_layout.count()):
             item = parent_layout.itemAt(i)
@@ -750,10 +813,9 @@ class NPGLiteSNES:
             bar.setObjectName(f'pbEMGCombo_{ch_a}_{ch_b}')
 
             cmb = QComboBox()
+            cmb.setObjectName(f'cmbEMGCombo_{ch_a}_{ch_b}')
             cmb.setMinimumWidth(80)
-            cmb.addItems(snes_keys)
-            if (ch_a, ch_b) in self._saved_combo_keys:
-                cmb.setCurrentIndex(self._saved_combo_keys[(ch_a, ch_b)])
+            self._fill_combo(cmb)
 
             row_layout.addWidget(lbl)
             row_layout.addWidget(bar)
@@ -1049,53 +1111,28 @@ class NPGLiteSNES:
         for lbl, bar, cmb, _, _ in self._emg_combo_rows:
             bar_cmb_pairs.append((bar, cmb))
 
-        keys_to_press = set()
+        # Key name -> 0..1. When several signals drive the same key, the strongest wins.
+        key_values = {}
         for bar, cmb in bar_cmb_pairs:
             if not bar.isVisible():
                 continue
             key_name = cmb.currentText()
             if key_name == "None":
                 continue
-            if bar.detected:
-                keys_to_press.add(key_name)
+            val = 1.0 if bar.detected else 0.0
+            key_values[key_name] = max(key_values.get(key_name, 0.0), val)
 
-        keys_to_press.update(self._detection_flash_keys)
+        # Double/triple blink and double jaw clench: full press for the flash time
+        for key_name in self._detection_flash_keys:
+            key_values[key_name] = 1.0
 
         if self.gamepad:
-            for key_name in keys_to_press:
-                xusb = SNES_TO_XUSB.get(key_name)
-                if xusb == "LT":
-                    if "LT" not in self._pressed_buttons:
-                        self.gamepad.left_trigger_float(value_float=1.0)
-                        self._pressed_buttons.add("LT")
-                elif xusb == "RT":
-                    if "RT" not in self._pressed_buttons:
-                        self.gamepad.right_trigger_float(value_float=1.0)
-                        self._pressed_buttons.add("RT")
-                elif xusb and xusb not in self._pressed_buttons:
-                    self.gamepad.press_button(xusb)
-                    self._pressed_buttons.add(xusb)
-
-            active_xusb = {SNES_TO_XUSB.get(k) for k in keys_to_press
-                           if k in SNES_TO_XUSB}
-            for xusb in list(self._pressed_buttons):
-                if xusb not in active_xusb:
-                    if xusb == "LT":
-                        self.gamepad.left_trigger_float(value_float=0.0)
-                    elif xusb == "RT":
-                        self.gamepad.right_trigger_float(value_float=0.0)
-                    else:
-                        self.gamepad.release_button(xusb)
-                    self._pressed_buttons.discard(xusb)
-
-            self.gamepad.update()
+            self.gamepad.apply(key_values)
 
         if self.test_dialog:
-            all_keys = ["A", "B", "X", "Y", "Dpad Up", "Dpad Down",
-                        "Dpad Left", "Dpad Right", "L", "R", "Start"]
-            for key_name in all_keys:
+            for key_name in KEYS_FOR_MODE[self.controller_mode]:
                 self.test_dialog.viewer.update_button(
-                    key_name, key_name in keys_to_press)
+                    key_name, key_values.get(key_name, 0.0) > 0)
 
     def _reset_progress_bars(self):
         for bar in [self.ui.pbFocus, self.ui.pbBlink,
@@ -1160,13 +1197,44 @@ class NPGLiteSNES:
             self._detection_flash_keys.discard(k)
         QTimer.singleShot(500, _end_flash)
 
+    def _create_gamepad(self):
+        """Create the virtual controller for the current mode
+        (staggered attempts on main thread to avoid UI freeze)."""
+        if not HAS_VGAMEPAD:
+            return
+        import gc
+        self._gamepad_gen += 1
+        gen = self._gamepad_gen
+        mode = self.controller_mode
+        name = CONTROLLER_NAMES[mode]
+
+        def _try_create_gamepad(attempt):
+            # Stop if disconnected, or the mode changed since this attempt was scheduled
+            if not self.is_connected or gen != self._gamepad_gen:
+                return
+            try:
+                self.gamepad = create_pad(mode)
+                self.ui.statusbar.showMessage(f"Virtual {name} controller connected", 4000)
+                print(f"Virtual {name} gamepad created")
+            except Exception as e:
+                print(f"Gamepad attempt {attempt}/3 failed: {e}")
+                self.gamepad = None
+                gc.collect()
+                if attempt < 3:
+                    QTimer.singleShot(1000, lambda: _try_create_gamepad(attempt + 1))
+                else:
+                    self.ui.statusbar.showMessage(
+                        f"Failed to create virtual {name} controller.", 6000)
+
+        _try_create_gamepad(1)
+
     def _destroy_gamepad(self):
         """Safely tear down the virtual gamepad and free the ViGEmBus slot."""
+        self._gamepad_gen += 1
         if self.gamepad is not None:
             import gc
             try:
-                self.gamepad.reset()
-                self.gamepad.update()
+                self.gamepad.release()
             except Exception as e:
                 print(f"Warning: Virtual gamepad reset failed: {e}")
             try:
@@ -1174,7 +1242,6 @@ class NPGLiteSNES:
             except Exception as e:
                 print(f"Warning: Virtual gamepad deletion failed: {e}")
             self.gamepad = None
-            self._pressed_buttons.clear()
             gc.collect()
             print("Virtual gamepad released")
 
