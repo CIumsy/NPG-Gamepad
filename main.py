@@ -22,6 +22,7 @@ Thank you for being part of this journey with us!
 
 import sys
 import os
+import time
 
 # Essential for PyInstaller one-file mode so PySide CSS/UI can find relative asset paths like 'icons/*.svg'
 if hasattr(sys, '_MEIPASS'):
@@ -147,6 +148,10 @@ class NPGLiteSNES:
         self.is_connected = False
         self.processors = [ChannelProcessor() for _ in range(MAX_CHANNELS)]
         self.selected_input = 0  # 0=All, 1-6=specific channel
+        self._active_chs = []        # ticked channel indices (cached for the per-sample loop)
+        self._last_eval = 0.0        # perf_counter() of the last signal evaluation
+        self._last_counter = None    # last firmware sample counter seen
+        self._lost_samples = 0
 
         # Virtual gamepad
         self.gamepad = None
@@ -183,7 +188,7 @@ class NPGLiteSNES:
         # 30Hz UI refresh timer
         self._ui_timer = QTimer()
         self._ui_timer.setInterval(33)
-        self._ui_timer.timeout.connect(self._update_progress_bars)
+        self._ui_timer.timeout.connect(self._refresh_ui)
         self._ui_timer.start()
 
         # Setup
@@ -494,6 +499,7 @@ class NPGLiteSNES:
 
             self._set_channel_controls_enabled(ch_idx, checked)
 
+        self._refresh_active_channels()
         self._update_filter_button_states()
 
     def _set_channel_controls_enabled(self, ch_idx, enabled):
@@ -663,6 +669,8 @@ class NPGLiteSNES:
     def _on_connected(self, num_channels):
         self.is_connected = True
         self.num_channels = num_channels
+        self._last_counter = None
+        self._lost_samples = 0
         self.ui.btnConnect.setText("DISCONNECT")
         self.ui.btnConnect.setChecked(True)
         self.ui.btnConnect.setEnabled(True)
@@ -840,6 +848,7 @@ class NPGLiteSNES:
 
     def _on_channel_toggled(self, ch_idx, state):
         enabled = bool(state)
+        self._refresh_active_channels()
         self._set_channel_controls_enabled(ch_idx, enabled)
         if enabled:
             self._apply_notch_to_all()
@@ -1129,83 +1138,123 @@ class NPGLiteSNES:
 
     # Data Processing
 
+    def _refresh_active_channels(self):
+        """Cache which channels are ticked so the per-sample loop needs no Qt calls.
+        Called synchronously wherever a channel checkbox changes."""
+        self._active_chs = [i for i in range(MAX_CHANNELS)
+                            if getattr(self.ui, f'grpCh{i + 1}').isChecked()]
+
     def _on_data(self, samples, num_channels):
         if not self.is_connected:
             return
-        for sample in samples:
-            for ch_idx in range(min(num_channels, MAX_CHANNELS)):
-                cb = getattr(self.ui, f'grpCh{ch_idx + 1}')
-                if not cb.isChecked():
-                    continue
-                self.processors[ch_idx].process(sample['channels'][ch_idx])
+        self._check_sample_counters(samples)
 
-    def _update_progress_bars(self):
-        """Route processor outputs to progress bars, run detection, and
-        trigger gamepad buttons (called at 30Hz by QTimer)."""
+        limit = min(num_channels, MAX_CHANNELS)
+        active = [(ch, self.processors[ch]) for ch in self._active_chs if ch < limit]
+        for sample in samples:
+            vals = sample['channels']
+            for ch, proc in active:
+                proc.process(vals[ch])
+
+        # Detection + gamepad output on every packet (every 20 ms), not on the UI timer
+        self._evaluate_signals()
+
+    def _check_sample_counters(self, samples):
+        """Count samples lost in transit using the firmware's 0-255 sample counter."""
+        if not samples:
+            return
+        first = samples[0]['counter']
+        if self._last_counter is not None:
+            expected = (self._last_counter + 1) & 0xFF
+            if first != expected:
+                lost = (first - expected) & 0xFF
+                self._lost_samples += lost
+                msg = f"Warning: {lost} samples lost in transit (total {self._lost_samples})"
+                print(msg)
+                self.ui.statusbar.showMessage(msg, 5000)
+        self._last_counter = samples[-1]['counter']
+
+    def _refresh_ui(self):
+        """30 Hz UI tick: repaint bars that changed, refresh the IMU row."""
         if not self.is_connected:
             return
+        # If packets stop arriving, keep evaluating like the old 30 Hz tick did
+        # (releases timed presses, lets blink/jaw timeouts fire)
+        if time.perf_counter() - self._last_eval > 0.05:
+            self._evaluate_signals()
+        for bar in self._all_bars():
+            bar.flush()
+        self._update_imu_row()
+
+    def _all_bars(self):
+        ui = self.ui
+        bars = [ui.pbFocus, ui.pbBlink, ui.pbLeftEye, ui.pbRightEye, ui.pbJaw, ui.pbECG,
+                ui.pbEMG1, ui.pbEMG2, ui.pbEMG3, ui.pbEMG4, ui.pbEMG5, ui.pbEMG6]
+        bars += [row[1] for row in self._emg_combo_rows]
+        return bars
+
+    def _evaluate_signals(self):
+        """Route processor outputs to the bars (repaint deferred to the UI tick),
+        run detection, and send the gamepad output."""
+        self._last_eval = time.perf_counter()
 
         focus_set = blink_set = jaw_set = ecg_set = False
         left_eye_set = right_eye_set = False
         emg_bars = [self.ui.pbEMG1, self.ui.pbEMG2, self.ui.pbEMG3,
                     self.ui.pbEMG4, self.ui.pbEMG5, self.ui.pbEMG6]
         emg_ch_envelopes = {}
+        active = [ch for ch in self._active_chs if ch < self.num_channels]
 
         jaw_owner = None
-        for ch in range(self.num_channels):
-            p = self.processors[ch]
-            cb = getattr(self.ui, f'grpCh{ch + 1}')
-            if cb.isChecked() and p.filter_type in ('eeg', 'eog'):
+        for ch in active:
+            if self.processors[ch].filter_type in ('eeg', 'eog'):
                 jaw_owner = ch
                 break
 
-        for ch in range(self.num_channels):
+        for ch in active:
             p = self.processors[ch]
-            cb = getattr(self.ui, f'grpCh{ch + 1}')
-            if not cb.isChecked():
-                continue
 
             if p.filter_type == 'eeg':
                 if not focus_set:
-                    self.ui.pbFocus.setValue(clamp100(p.val_beta_pct, 100.0))
+                    self.ui.pbFocus.setValue(clamp100(p.val_beta_pct, 100.0), repaint=False)
                     focus_set = True
                 if not blink_set:
-                    self.ui.pbBlink.setValue(clamp100(p.val_blink_envelope, BLINK_SCALE))
+                    self.ui.pbBlink.setValue(clamp100(p.val_blink_envelope, BLINK_SCALE), repaint=False)
                     blink_set = True
                 if ch == jaw_owner and not jaw_set:
-                    self.ui.pbJaw.setValue(clamp100(p.val_jaw_envelope, JAW_SCALE))
+                    self.ui.pbJaw.setValue(clamp100(p.val_jaw_envelope, JAW_SCALE), repaint=False)
                     jaw_set = True
 
             elif p.filter_type == 'eog':
                 if not left_eye_set:
                     left_val = max(0.0, p.val_eye_deviation)
-                    self.ui.pbLeftEye.setValue(clamp100(left_val, EYE_SCALE))
+                    self.ui.pbLeftEye.setValue(clamp100(left_val, EYE_SCALE), repaint=False)
                     left_eye_set = True
                 if not right_eye_set:
                     right_val = max(0.0, -p.val_eye_deviation)
-                    self.ui.pbRightEye.setValue(clamp100(right_val, EYE_SCALE))
+                    self.ui.pbRightEye.setValue(clamp100(right_val, EYE_SCALE), repaint=False)
                     right_eye_set = True
                 if ch == jaw_owner and not jaw_set:
-                    self.ui.pbJaw.setValue(clamp100(p.val_jaw_envelope, JAW_SCALE))
+                    self.ui.pbJaw.setValue(clamp100(p.val_jaw_envelope, JAW_SCALE), repaint=False)
                     jaw_set = True
 
             elif p.filter_type == 'emg':
-                emg_bars[ch].setValue(clamp100(p.val_emg_envelope, EMG_SCALE))
+                emg_bars[ch].setValue(clamp100(p.val_emg_envelope, EMG_SCALE), repaint=False)
                 emg_ch_envelopes[ch + 1] = p.val_emg_envelope
 
             elif p.filter_type == 'ecg' and not ecg_set:
-                self.ui.pbECG.setValue(clamp100(p.val_ecg, ECG_SCALE))
+                self.ui.pbECG.setValue(clamp100(p.val_ecg, ECG_SCALE), repaint=False)
                 ecg_set = True
 
-        if not focus_set:     self.ui.pbFocus.setValue(0)
-        if not blink_set:     self.ui.pbBlink.setValue(0)
-        if not left_eye_set:  self.ui.pbLeftEye.setValue(0)
-        if not right_eye_set: self.ui.pbRightEye.setValue(0)
-        if not jaw_set:       self.ui.pbJaw.setValue(0)
-        if not ecg_set:       self.ui.pbECG.setValue(0)
+        if not focus_set:     self.ui.pbFocus.setValue(0, repaint=False)
+        if not blink_set:     self.ui.pbBlink.setValue(0, repaint=False)
+        if not left_eye_set:  self.ui.pbLeftEye.setValue(0, repaint=False)
+        if not right_eye_set: self.ui.pbRightEye.setValue(0, repaint=False)
+        if not jaw_set:       self.ui.pbJaw.setValue(0, repaint=False)
+        if not ecg_set:       self.ui.pbECG.setValue(0, repaint=False)
         for i in range(6):
             if (i + 1) not in emg_ch_envelopes:
-                emg_bars[i].setValue(0)
+                emg_bars[i].setValue(0, repaint=False)
 
         # EMG combination rows update
         for lbl, bar, cmb, ch_a, ch_b in self._emg_combo_rows:
@@ -1214,11 +1263,10 @@ class NPGLiteSNES:
             val_a = emg_ch_envelopes.get(ch_a, 0.0)
             val_b = emg_ch_envelopes.get(ch_b, 0.0)
             combined = val_a + val_b
-            bar.setValue(clamp100(combined, EMG_SCALE * 2))
+            bar.setValue(clamp100(combined, EMG_SCALE * 2), repaint=False)
 
         self._process_blink_jaw_detection()
         self._process_key_mappings()
-        self._update_imu_row()
 
     def _process_key_mappings(self):
         """Check each ThresholdBar's detected state, read its combo box mapping,

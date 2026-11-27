@@ -13,7 +13,8 @@ from PySide6.QtGui import QPainter, QColor, QPen, QPolygonF
 class ThresholdBar(QWidget):
     thresholdChanged = Signal(int)   # new threshold (0-100)
 
-    # Palette 
+    # Palette
+    _PANEL   = QColor('#141414')     # Signal Inputs panel colour (painted so the bar is opaque)
     _BG      = QColor('#1a1a1a')
     _BORDER  = QColor('#2a2a2a')
     _FILL    = QColor('#ffffff')
@@ -25,19 +26,36 @@ class ThresholdBar(QWidget):
         self._value = 0
         self._threshold = max(0, min(100, threshold))
         self._dragging = False
+        self._dirty = False
         self.setMinimumHeight(18)
         self.setFixedHeight(20)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.setCursor(Qt.PointingHandCursor)
+        # The bar paints its whole rect (panel colour first), so Qt doesn't
+        # need to repaint the styled panel behind it on every update.
+        self.setAttribute(Qt.WA_OpaquePaintEvent, True)
 
-    # Public API (drop-in for QProgressBar) 
+    # Public API (drop-in for QProgressBar)
 
     def value(self):
         return self._value
 
-    def setValue(self, v):
-        self._value = max(0, min(100, int(v)))
-        self.update()
+    def setValue(self, v, repaint=True):
+        """Set the value. Repaints only if it changed. With repaint=False the
+        repaint is deferred until flush() (lets logic run faster than the UI)."""
+        v = max(0, min(100, int(v)))
+        if v != self._value:
+            self._value = v
+            if repaint:
+                self.update()
+            else:
+                self._dirty = True
+
+    def flush(self):
+        """Repaint if a deferred value change is pending."""
+        if self._dirty:
+            self._dirty = False
+            self.update()
 
     def threshold(self):
         return self._threshold
@@ -63,6 +81,9 @@ class ThresholdBar(QWidget):
         h = self.height()
         r = 6                       # border-radius
         m = 2                       # inner margin
+
+        # 0. Panel colour behind the rounded corners (bar is opaque)
+        p.fillRect(self.rect(), self._PANEL)
 
         # 1. Background + border (matches QProgressBar stylesheet)
         p.setPen(QPen(self._BORDER, 1))
