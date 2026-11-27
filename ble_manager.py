@@ -3,6 +3,7 @@
 
 import asyncio
 import threading
+import time
 
 from PySide6.QtCore import QObject, Signal
 from ble_connection import NPGConnection
@@ -18,8 +19,12 @@ class BLEManager(QObject):
     imu_received        = Signal(list)
     error               = Signal(str)
 
-    def __init__(self):
+    def __init__(self, sink=None):
+        """sink: optional object with on_data(samples, n, t_arrival) and
+        on_imu(samples, t_arrival). Packets then go straight to it from the BLE
+        thread (no UI-thread hop) instead of through the Qt signals."""
         super().__init__()
+        self._sink = sink
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
@@ -60,9 +65,14 @@ class BLEManager(QObject):
         try:
             self._conn = NPGConnection()
             await self._conn.connect(npg_device)
-            self._conn.on_data(lambda s, n: self.data_received.emit(s, n))
+            sink = self._sink
+            if sink is not None:
+                self._conn.on_data(lambda s, n: sink.on_data(s, n, time.perf_counter()))
+                self._conn.on_imu(lambda s: sink.on_imu(s, time.perf_counter()))
+            else:
+                self._conn.on_data(lambda s, n: self.data_received.emit(s, n))
+                self._conn.on_imu(lambda s: self.imu_received.emit(s))
             self._conn.on_battery(lambda p: self.battery_updated.emit(p))
-            self._conn.on_imu(lambda s: self.imu_received.emit(s))
             await self._conn.start_streaming()
             self.imu_available.emit(self._conn.has_imu)
             self.device_connected.emit(self._conn.num_channels)

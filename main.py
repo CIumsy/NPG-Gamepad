@@ -22,7 +22,6 @@ Thank you for being part of this journey with us!
 
 import sys
 import os
-import time
 
 # Essential for PyInstaller one-file mode so PySide CSS/UI can find relative asset paths like 'icons/*.svg'
 if hasattr(sys, '_MEIPASS'):
@@ -51,17 +50,39 @@ qInstallMessageHandler(qt_message_handler)
 
 from gamepad import (
     resource_path, HAS_VGAMEPAD, ensure_vigembus, create_pad,
-    MODE_XBOX, MODE_DS4, KEYS_FOR_MODE, CONTROLLER_NAMES, DS4_ANALOG_KEYS,
+    MODE_XBOX, MODE_DS4, KEYS_FOR_MODE, CONTROLLER_NAMES,
     IMU_STICK_PREFIX,
 )
-from config import MAX_CHANNELS, FILTER_MAP, EMG_SCALE, BLINK_SCALE, EYE_SCALE, JAW_SCALE, ECG_SCALE, clamp100, DEFAULT_THRESHOLDS
+from config import MAX_CHANNELS, FILTER_MAP, DEFAULT_THRESHOLDS
 from ble_manager import BLEManager
-from channel_processor import ChannelProcessor
+from engine import SignalEngine, EngineConfig, FIXED_ROWS
 from widgets.ThresholdBar import ThresholdBar
 from widgets.ControllerViewer import ControllerViewer
 from widgets.DualSenseViewer import DualSenseViewer
 from widgets.IMUCalibrationDialog import IMUCalibrationDialog
-from Algorithms.IMUProcessor import IMUProcessor
+from Algorithms.IMUProcessor import Calibrator
+
+
+class IMUControl:
+    """UI-side handle to the engine's IMUProcessor. Reads are passed through;
+    anything that changes IMU state runs on the engine thread, between packets."""
+
+    def __init__(self, engine):
+        self._engine = engine
+
+    def __getattr__(self, name):          # stick, calibrated, receiving, calibrator, ...
+        return getattr(self._engine.imu, name)
+
+    def start_calibration(self):
+        cal = Calibrator()
+        self._engine.call(self._engine.imu.start_calibration, cal)
+        return cal
+
+    def cancel_calibration(self):
+        self._engine.call(self._engine.imu.cancel_calibration)
+
+    def reset(self):
+        self._engine.call(self._engine.imu.reset)
 
 
 # Controller Test Dialog
@@ -146,17 +167,17 @@ class NPGLiteSNES:
         # State
         self.num_channels = 0
         self.is_connected = False
-        self.processors = [ChannelProcessor() for _ in range(MAX_CHANNELS)]
         self.selected_input = 0  # 0=All, 1-6=specific channel
-        self._active_chs = []        # ticked channel indices (cached for the per-sample loop)
-        self._last_eval = 0.0        # perf_counter() of the last signal evaluation
-        self._last_counter = None    # last firmware sample counter seen
-        self._lost_samples = 0
+        self._active_chs = []        # ticked channel indices
+        self.filter_types = ['emg'] * MAX_CHANNELS   # UI copy; the engine owns the processors
 
-        # Virtual gamepad
+        # Signal engine: filtering, detection, IMU and gamepad output on its own thread
+        self.engine = SignalEngine()
+        self._engine_cfg = None
+
+        # Virtual gamepad (created/destroyed here, used by the engine)
         self.gamepad = None
         self._gamepad_gen = 0   # bumps on every create/destroy to cancel stale retries
-        self._detection_flash_keys = set()
 
         # Controller mode (Xbox / DualShock). Each mode keeps its own key mappings.
         self.controller_mode = MODE_XBOX
@@ -165,25 +186,15 @@ class NPGLiteSNES:
         # Test Controller Window
         self.test_dialog = None
 
-        # IMU (MPU6050) motion -> analog stick
-        self.imu = IMUProcessor()
+        # IMU (MPU6050) motion -> analog stick (processed by the engine)
+        self.imu = IMUControl(self.engine)
         self.has_imu = False
         self.imu_dialog = None
-        self._signal_key_values = {}     # latest signal mappings (30 Hz), merged with the IMU stick
         self._imu_stick_choice = {MODE_XBOX: "None", MODE_DS4: "None"}
 
-        # Blink / Jaw Clench detectors
-        from Algorithms.BlinkDetector import BlinkDetector
-        from Algorithms.JawClenchDetector import JawClenchDetector
-        self.blink_detector = BlinkDetector()
-        self.jaw_detector = JawClenchDetector()
-        self.last_blink_event = None
-        self.last_jaw_event = None
-        self._blink_action_timer = 0
-        self._jaw_action_timer = 0
-
-        # BLE
-        self.ble = BLEManager()
+        # BLE: packets go straight from the BLE thread to the engine
+        self.ble = BLEManager(sink=self.engine)
+        self.engine.start()
 
         # 30Hz UI refresh timer
         self._ui_timer = QTimer()
@@ -369,11 +380,11 @@ class NPGLiteSNES:
         # Remember this mode's mappings, then swap every drop-down's key list
         self._save_mode_selections()
         self.controller_mode = new_mode
-        self._detection_flash_keys.clear()
         for cmb in self._all_combos():
             self._fill_combo(cmb)
         self._fill_imu_combo()
-        self._signal_key_values = {}
+        self.engine.call(self.engine.clear_outputs)
+        self._push_config()
 
         # Swap the virtual controller live if we are connected
         self._destroy_gamepad()
@@ -464,11 +475,17 @@ class NPGLiteSNES:
         self.ble.scan_result.connect(self._on_scan_result)
         self.ble.device_connected.connect(self._on_connected)
         self.ble.device_disconnected.connect(self._on_disconnected)
-        self.ble.data_received.connect(self._on_data)
         self.ble.battery_updated.connect(self._on_battery)
         self.ble.imu_available.connect(self._on_imu_available)
-        self.ble.imu_received.connect(self._on_imu_samples)
         self.ble.error.connect(self._on_error)
+
+        # Anything the engine reads: push a new settings snapshot immediately
+        for name, _ in FIXED_ROWS:
+            getattr(self.ui, name).thresholdChanged.connect(self._push_config)
+        for cmb in self._static_combos():
+            cmb.currentIndexChanged.connect(self._push_config)
+        for grp in (self.ui.grpDoubleBlink, self.ui.grpTripleBlink, self.ui.grpDoubleJawClench):
+            grp.toggled.connect(self._push_config)
 
     # Channel Enable / Disable
 
@@ -511,8 +528,16 @@ class NPGLiteSNES:
 
         if not enabled:
             getattr(self.ui, f'btnFilterCh{ch}EMG').setChecked(True)
-            self.processors[ch_idx].set_filter('emg')
-            self.processors[ch_idx].set_notch('off')
+            self._set_filter(ch_idx, 'emg')
+            self._set_notch(ch_idx, 'off')
+
+    def _set_filter(self, ch_idx, ftype):
+        """Change a channel's filter: UI copy now, engine processor between packets."""
+        self.filter_types[ch_idx] = ftype
+        self.engine.call(self.engine.processors[ch_idx].set_filter, ftype)
+
+    def _set_notch(self, ch_idx, setting):
+        self.engine.call(self.engine.processors[ch_idx].set_notch, setting)
 
     def _fix_groupbox_styles(self):
         """Enforce badge-style titles and checkboxes on the channel groupboxes."""
@@ -669,8 +694,7 @@ class NPGLiteSNES:
     def _on_connected(self, num_channels):
         self.is_connected = True
         self.num_channels = num_channels
-        self._last_counter = None
-        self._lost_samples = 0
+        self.engine.call(self.engine.reset_stream)
         self.ui.btnConnect.setText("DISCONNECT")
         self.ui.btnConnect.setChecked(True)
         self.ui.btnConnect.setEnabled(True)
@@ -681,7 +705,7 @@ class NPGLiteSNES:
         # Apply initial filter settings to processors
         for ch in range(num_channels):
             filter_id = self.grp_filter_ch[ch].checkedId()
-            self.processors[ch].set_filter(FILTER_MAP.get(filter_id, 'emg'))
+            self._set_filter(ch, FILTER_MAP.get(filter_id, 'emg'))
         self._apply_notch_to_all()
 
         # Create virtual gamepad for the selected mode
@@ -694,10 +718,12 @@ class NPGLiteSNES:
         self.selected_input = 1
         self._rebuild_emg_combo_rows()
         self._update_input_visibility()
+        self._push_config()
 
     def _on_disconnected(self):
         self.is_connected = False
         self.num_channels = 0
+        self._push_config()                  # engine stops using data right away
         self.ui.btnConnect.setChecked(False)
         self.ui.btnConnect.setText("CONNECT")
         self.ui.btnConnect.setEnabled(True)
@@ -706,6 +732,7 @@ class NPGLiteSNES:
         self._reset_progress_bars()
 
         self._destroy_gamepad()
+        self.engine.call(self.engine.clear_outputs)
 
         if self.test_dialog:
             self.test_dialog.viewer.reset_all()
@@ -714,7 +741,6 @@ class NPGLiteSNES:
             self.imu_dialog.close()
         self.imu.reset()
         self.has_imu = False
-        self._signal_key_values = {}
         self._update_imu_row()
 
         self.ui.btnSel_Input_All.setChecked(True)
@@ -753,6 +779,7 @@ class NPGLiteSNES:
         self.cmb_imu.setObjectName('cmbIMU')
         self.cmb_imu.setMinimumWidth(110)
         self._fill_imu_combo()
+        self.cmb_imu.currentIndexChanged.connect(self._push_config)
 
         row = QHBoxLayout()
         row.setSpacing(12)
@@ -836,12 +863,12 @@ class NPGLiteSNES:
         for ch_idx in range(self.num_channels):
             cb = getattr(self.ui, f'grpCh{ch_idx + 1}')
             if cb.isChecked():
-                self.processors[ch_idx].set_notch(setting)
+                self._set_notch(ch_idx, setting)
 
     # Handlers: Filter & Channel
 
     def _on_filter_ch(self, ch, id_):
-        self.processors[ch].set_filter(FILTER_MAP.get(id_, 'emg'))
+        self._set_filter(ch, FILTER_MAP.get(id_, 'emg'))
         self._update_filter_button_states()
         self._rebuild_emg_combo_rows()
         self._update_input_visibility()
@@ -853,7 +880,7 @@ class NPGLiteSNES:
         if enabled:
             self._apply_notch_to_all()
             filter_id = self.grp_filter_ch[ch_idx].checkedId()
-            self.processors[ch_idx].set_filter(FILTER_MAP.get(filter_id, 'emg'))
+            self._set_filter(ch_idx, FILTER_MAP.get(filter_id, 'emg'))
         self._update_filter_button_states()
         self._rebuild_emg_combo_rows()
         self._update_input_visibility()
@@ -869,7 +896,7 @@ class NPGLiteSNES:
                 if filter_id in (1, 2, 3):
                     if filter_id in active_filters:
                         getattr(self.ui, f'btnFilterCh{ch_idx + 1}EMG').setChecked(True)
-                        self.processors[ch_idx].set_filter('emg')
+                        self._set_filter(ch_idx, 'emg')
                     else:
                         active_filters[filter_id] = ch_idx
         
@@ -920,7 +947,7 @@ class NPGLiteSNES:
         active_emg = []
         for ch in range(self.num_channels):
             cb = getattr(self.ui, f'grpCh{ch + 1}')
-            if cb.isChecked() and self.processors[ch].filter_type == 'emg':
+            if cb.isChecked() and self.filter_types[ch] == 'emg':
                 active_emg.append(ch + 1)
 
         if len(active_emg) < 2:
@@ -953,6 +980,8 @@ class NPGLiteSNES:
             cmb.setObjectName(f'cmbEMGCombo_{ch_a}_{ch_b}')
             cmb.setMinimumWidth(80)
             self._fill_combo(cmb)
+            cmb.currentIndexChanged.connect(self._push_config)
+            bar.thresholdChanged.connect(self._push_config)
 
             row_layout.addWidget(lbl)
             row_layout.addWidget(bar)
@@ -985,6 +1014,11 @@ class NPGLiteSNES:
             self._update_input_visibility()
 
     def _update_input_visibility(self):
+        """Show/hide signal input rows; only visible rows are mapped, so tell the engine."""
+        self._apply_input_visibility()
+        self._push_config()
+
+    def _apply_input_visibility(self):
         """Show/hide signal input rows based on the input selector."""
         sel = self.selected_input
 
@@ -1035,7 +1069,7 @@ class NPGLiteSNES:
             cb = getattr(self.ui, f'grpCh{ch_idx + 1}')
             if not cb.isChecked():
                 continue
-            ft = self.processors[ch_idx].filter_type
+            ft = self.filter_types[ch_idx]
             active_types.add(ft)
             if ft == 'emg':
                 emg_chs.append(ch_idx + 1)
@@ -1101,7 +1135,7 @@ class NPGLiteSNES:
             if ch_idx < self.num_channels:
                 cb = getattr(self.ui, f'grpCh{sel}')
                 if cb.isChecked():
-                    ftype = self.processors[ch_idx].filter_type
+                    ftype = self.filter_types[ch_idx]
                     if ftype == 'eeg':
                         for k in ('focus', 'blink', 'jaw'):
                             fixed[k][0].setVisible(True)
@@ -1136,221 +1170,69 @@ class NPGLiteSNES:
                                 bar2.setVisible(True)
                                 cmb2.setVisible(True)
 
-    # Data Processing
+    # Engine link (signals are processed on the engine thread, see engine.py)
 
     def _refresh_active_channels(self):
-        """Cache which channels are ticked so the per-sample loop needs no Qt calls.
-        Called synchronously wherever a channel checkbox changes."""
+        """Cache which channels are ticked (sent to the engine with the config)."""
         self._active_chs = [i for i in range(MAX_CHANNELS)
                             if getattr(self.ui, f'grpCh{i + 1}').isChecked()]
 
-    def _on_data(self, samples, num_channels):
-        if not self.is_connected:
-            return
-        self._check_sample_counters(samples)
+    def _build_config(self):
+        """Snapshot of every UI setting the engine uses."""
+        ui = self.ui
+        rows = tuple(
+            (bar, getattr(ui, cmb).currentText(), getattr(ui, bar).isVisible(),
+             getattr(ui, bar).threshold())
+            for bar, cmb in FIXED_ROWS)
+        combo_rows = tuple(
+            (ch_a, ch_b, cmb.currentText(), bar.isVisible(), bar.threshold())
+            for _, bar, cmb, ch_a, ch_b in getattr(self, '_emg_combo_rows', []))
+        cmb_imu = getattr(self, 'cmb_imu', None)
+        return EngineConfig(
+            connected=self.is_connected,
+            num_channels=self.num_channels,
+            active_chs=tuple(self._active_chs),
+            mode=self.controller_mode,
+            rows=rows,
+            combo_rows=combo_rows,
+            double_blink=(ui.grpDoubleBlink.isChecked(), ui.cmbDoubleBlink.currentText()),
+            triple_blink=(ui.grpTripleBlink.isChecked(), ui.cmbTripleBlink.currentText()),
+            double_jaw=(ui.grpDoubleJawClench.isChecked(), ui.cmbDoubleJawClench.currentText()),
+            imu_prefix=IMU_STICK_PREFIX.get(cmb_imu.currentText()) if cmb_imu else None,
+            blink_threshold=ui.pbBlink.threshold(),
+            jaw_threshold=ui.pbJaw.threshold(),
+        )
 
-        limit = min(num_channels, MAX_CHANNELS)
-        active = [(ch, self.processors[ch]) for ch in self._active_chs if ch < limit]
-        for sample in samples:
-            vals = sample['channels']
-            for ch, proc in active:
-                proc.process(vals[ch])
-
-        # Detection + gamepad output on every packet (every 20 ms), not on the UI timer
-        self._evaluate_signals()
-
-    def _check_sample_counters(self, samples):
-        """Count samples lost in transit using the firmware's 0-255 sample counter."""
-        if not samples:
-            return
-        first = samples[0]['counter']
-        if self._last_counter is not None:
-            expected = (self._last_counter + 1) & 0xFF
-            if first != expected:
-                lost = (first - expected) & 0xFF
-                self._lost_samples += lost
-                msg = f"Warning: {lost} samples lost in transit (total {self._lost_samples})"
-                print(msg)
-                self.ui.statusbar.showMessage(msg, 5000)
-        self._last_counter = samples[-1]['counter']
+    def _push_config(self, *_):
+        """Send the engine a new settings snapshot if anything changed."""
+        cfg = self._build_config()
+        if cfg != self._engine_cfg:
+            self._engine_cfg = cfg
+            self.engine.set_config(cfg)
 
     def _refresh_ui(self):
-        """30 Hz UI tick: repaint bars that changed, refresh the IMU row."""
+        """30 Hz UI tick: show the engine's latest values. Never on the signal path."""
+        self._push_config()          # safety net: picks up any change not signalled directly
         if not self.is_connected:
             return
-        # If packets stop arriving, keep evaluating like the old 30 Hz tick did
-        # (releases timed presses, lets blink/jaw timeouts fire)
-        if time.perf_counter() - self._last_eval > 0.05:
-            self._evaluate_signals()
-        for bar in self._all_bars():
-            bar.flush()
-        self._update_imu_row()
+        eng = self.engine
+        while eng.lost_events:
+            lost, total = eng.lost_events.popleft()
+            msg = f"Warning: {lost} samples lost in transit (total {total})"
+            print(msg)
+            self.ui.statusbar.showMessage(msg, 5000)
 
-    def _all_bars(self):
-        ui = self.ui
-        bars = [ui.pbFocus, ui.pbBlink, ui.pbLeftEye, ui.pbRightEye, ui.pbJaw, ui.pbECG,
-                ui.pbEMG1, ui.pbEMG2, ui.pbEMG3, ui.pbEMG4, ui.pbEMG5, ui.pbEMG6]
-        bars += [row[1] for row in self._emg_combo_rows]
-        return bars
-
-    def _evaluate_signals(self):
-        """Route processor outputs to the bars (repaint deferred to the UI tick),
-        run detection, and send the gamepad output."""
-        self._last_eval = time.perf_counter()
-
-        focus_set = blink_set = jaw_set = ecg_set = False
-        left_eye_set = right_eye_set = False
-        emg_bars = [self.ui.pbEMG1, self.ui.pbEMG2, self.ui.pbEMG3,
-                    self.ui.pbEMG4, self.ui.pbEMG5, self.ui.pbEMG6]
-        emg_ch_envelopes = {}
-        active = [ch for ch in self._active_chs if ch < self.num_channels]
-
-        jaw_owner = None
-        for ch in active:
-            if self.processors[ch].filter_type in ('eeg', 'eog'):
-                jaw_owner = ch
-                break
-
-        for ch in active:
-            p = self.processors[ch]
-
-            if p.filter_type == 'eeg':
-                if not focus_set:
-                    self.ui.pbFocus.setValue(clamp100(p.val_beta_pct, 100.0), repaint=False)
-                    focus_set = True
-                if not blink_set:
-                    self.ui.pbBlink.setValue(clamp100(p.val_blink_envelope, BLINK_SCALE), repaint=False)
-                    blink_set = True
-                if ch == jaw_owner and not jaw_set:
-                    self.ui.pbJaw.setValue(clamp100(p.val_jaw_envelope, JAW_SCALE), repaint=False)
-                    jaw_set = True
-
-            elif p.filter_type == 'eog':
-                if not left_eye_set:
-                    left_val = max(0.0, p.val_eye_deviation)
-                    self.ui.pbLeftEye.setValue(clamp100(left_val, EYE_SCALE), repaint=False)
-                    left_eye_set = True
-                if not right_eye_set:
-                    right_val = max(0.0, -p.val_eye_deviation)
-                    self.ui.pbRightEye.setValue(clamp100(right_val, EYE_SCALE), repaint=False)
-                    right_eye_set = True
-                if ch == jaw_owner and not jaw_set:
-                    self.ui.pbJaw.setValue(clamp100(p.val_jaw_envelope, JAW_SCALE), repaint=False)
-                    jaw_set = True
-
-            elif p.filter_type == 'emg':
-                emg_bars[ch].setValue(clamp100(p.val_emg_envelope, EMG_SCALE), repaint=False)
-                emg_ch_envelopes[ch + 1] = p.val_emg_envelope
-
-            elif p.filter_type == 'ecg' and not ecg_set:
-                self.ui.pbECG.setValue(clamp100(p.val_ecg, ECG_SCALE), repaint=False)
-                ecg_set = True
-
-        if not focus_set:     self.ui.pbFocus.setValue(0, repaint=False)
-        if not blink_set:     self.ui.pbBlink.setValue(0, repaint=False)
-        if not left_eye_set:  self.ui.pbLeftEye.setValue(0, repaint=False)
-        if not right_eye_set: self.ui.pbRightEye.setValue(0, repaint=False)
-        if not jaw_set:       self.ui.pbJaw.setValue(0, repaint=False)
-        if not ecg_set:       self.ui.pbECG.setValue(0, repaint=False)
-        for i in range(6):
-            if (i + 1) not in emg_ch_envelopes:
-                emg_bars[i].setValue(0, repaint=False)
-
-        # EMG combination rows update
-        for lbl, bar, cmb, ch_a, ch_b in self._emg_combo_rows:
-            if not bar.isVisible():
-                continue
-            val_a = emg_ch_envelopes.get(ch_a, 0.0)
-            val_b = emg_ch_envelopes.get(ch_b, 0.0)
-            combined = val_a + val_b
-            bar.setValue(clamp100(combined, EMG_SCALE * 2), repaint=False)
-
-        self._process_blink_jaw_detection()
-        self._process_key_mappings()
-
-    def _process_key_mappings(self):
-        """Check each ThresholdBar's detected state, read its combo box mapping,
-        and press/release the corresponding gamepad button."""
-        bar_cmb_pairs = [
-            (self.ui.pbFocus,    self.ui.cmbFocus),
-            (self.ui.pbBlink,    self.ui.cmbBlink),
-            (self.ui.pbLeftEye,  self.ui.cmbLeftEye),
-            (self.ui.pbRightEye, self.ui.cmbRightEye),
-            (self.ui.pbJaw,      self.ui.cmbJaw),
-            (self.ui.pbECG,      self.ui.cmbECG),
-            (self.ui.pbEMG1,     self.ui.cmbEMG1),
-            (self.ui.pbEMG2,     self.ui.cmbEMG2),
-            (self.ui.pbEMG3,     self.ui.cmbEMG3),
-            (self.ui.pbEMG4,     self.ui.cmbEMG4),
-            (self.ui.pbEMG5,     self.ui.cmbEMG5),
-            (self.ui.pbEMG6,     self.ui.cmbEMG6),
-        ]
-        for lbl, bar, cmb, _, _ in self._emg_combo_rows:
-            bar_cmb_pairs.append((bar, cmb))
-
-        # Key name -> 0..1. When several signals drive the same key, the strongest wins.
-        key_values = {}
-        for bar, cmb in bar_cmb_pairs:
-            if not bar.isVisible():
-                continue
-            key_name = cmb.currentText()
-            if key_name == "None":
-                continue
-            if self.controller_mode == MODE_DS4 and key_name in DS4_ANALOG_KEYS:
-                val = self._analog_value(bar)
-            else:
-                val = 1.0 if bar.detected else 0.0
-            key_values[key_name] = max(key_values.get(key_name, 0.0), val)
-
-        # Double/triple blink and double jaw clench: full press for the flash time
-        for key_name in self._detection_flash_keys:
-            key_values[key_name] = 1.0
-
-        self._signal_key_values = key_values
-        self._send_outputs()
-
-    def _send_outputs(self):
-        """Merge the latest signal mappings with the IMU stick and send them to the
-        gamepad and tester. Runs at 30 Hz for signals and on every IMU packet."""
-        key_values = dict(self._signal_key_values)
-        for key_name, val in self._imu_key_values().items():
-            key_values[key_name] = max(key_values.get(key_name, 0.0), val)
-
-        if self.gamepad:
-            self.gamepad.apply(key_values)
+        values = eng.bar_values
+        for name, _ in FIXED_ROWS:
+            getattr(self.ui, name).setValue(values.get(name, 0))
+        combos = eng.combo_values
+        for _, bar, _, ch_a, ch_b in self._emg_combo_rows:
+            if (ch_a, ch_b) in combos:
+                bar.setValue(combos[(ch_a, ch_b)])
 
         if self.test_dialog:
-            self.test_dialog.update_values(key_values)
-
-    def _imu_key_values(self):
-        """IMU stick as stick-direction key values, e.g. {'LS Left': 0.4, 'LS Up': 0.7}."""
-        if self.controller_mode != MODE_DS4 or not self.imu.calibrated:
-            return {}
-        prefix = IMU_STICK_PREFIX.get(self.cmb_imu.currentText())
-        if prefix is None:
-            return {}
-        x, y = self.imu.stick
-        return {
-            f"{prefix} Right": max(0.0, x), f"{prefix} Left": max(0.0, -x),
-            f"{prefix} Up": max(0.0, y), f"{prefix} Down": max(0.0, -y),
-        }
-
-    def _on_imu_samples(self, samples):
-        self.imu.process(samples)
-        # Push the stick straight away instead of waiting for the 30 Hz tick
-        if self.is_connected and self._imu_key_values():
-            self._send_outputs()
-
-    @staticmethod
-    def _analog_value(bar):
-        """Map a bar onto 0..1 for an analog control. The range is the
-        threshold +/- 50%: threshold 40 -> 20 is 0.0 and 60 is 1.0."""
-        thresh = bar.threshold()
-        if thresh <= 0:
-            return 0.0      # threshold 0 disables the signal, same as for buttons
-        low = thresh * 0.5
-        high = min(100.0, thresh * 1.5)
-        return max(0.0, min(1.0, (bar.value() - low) / (high - low)))
+            self.test_dialog.update_values(eng.key_values)
+        self._update_imu_row()
 
     def _reset_progress_bars(self):
         for bar in [self.ui.pbFocus, self.ui.pbBlink,
@@ -1361,59 +1243,6 @@ class NPGLiteSNES:
             bar.setValue(0)
         for _, bar, _, _, _ in self._emg_combo_rows:
             bar.setValue(0)
-
-    # Blink / Jaw multi-event detection
-
-    def _process_blink_jaw_detection(self):
-        """Feed latest envelope values into BlinkDetector / JawClenchDetector
-        and trigger gamepad actions for double/triple events."""
-        import time
-        now_ms = int(time.time() * 1000)
-
-        blink_thresh = (self.ui.pbBlink.threshold() / 100.0) * BLINK_SCALE
-        jaw_thresh = (self.ui.pbJaw.threshold() / 100.0) * JAW_SCALE
-        self.blink_detector.threshold = blink_thresh
-        self.jaw_detector.threshold = jaw_thresh
-
-        blink_sample = None
-        jaw_sample = None
-        for ch in range(self.num_channels):
-            p = self.processors[ch]
-            cb = getattr(self.ui, f'grpCh{ch + 1}')
-            if not cb.isChecked():
-                continue
-            if p.filter_type == 'eeg' and blink_sample is None:
-                blink_sample = p.val_blink_envelope
-                if jaw_sample is None:
-                    jaw_sample = p.val_jaw_envelope
-            elif p.filter_type == 'eog' and jaw_sample is None:
-                jaw_sample = p.val_jaw_envelope
-
-        if blink_sample is not None:
-            # Always process to maintain moving window state, then check if we should trigger
-            event = self.blink_detector.process(blink_sample, now_ms)
-            if event == 'double' and self.ui.grpDoubleBlink.isChecked():
-                self._trigger_detection_action(self.ui.cmbDoubleBlink)
-            elif event == 'triple' and self.ui.grpTripleBlink.isChecked():
-                self._trigger_detection_action(self.ui.cmbTripleBlink)
-
-        if jaw_sample is not None:
-            event = self.jaw_detector.process(jaw_sample, now_ms)
-            if event == 'double' and self.ui.grpDoubleJawClench.isChecked():
-                self._trigger_detection_action(self.ui.cmbDoubleJawClench)
-
-    def _trigger_detection_action(self, cmb):
-        """Register a detection event to press a gamepad button for 500ms."""
-        key_name = cmb.currentText()
-        if key_name == 'None':
-            return
-            
-        self._detection_flash_keys.add(key_name)
-        print(f"Triggered detection for '{key_name}'")
-
-        def _end_flash(k=key_name):
-            self._detection_flash_keys.discard(k)
-        QTimer.singleShot(500, _end_flash)
 
     def _create_gamepad(self):
         """Create the virtual controller for the current mode
@@ -1432,6 +1261,7 @@ class NPGLiteSNES:
                 return
             try:
                 self.gamepad = create_pad(mode)
+                self.engine.set_pad(self.gamepad)
                 self.ui.statusbar.showMessage(f"Virtual {name} controller connected", 4000)
                 print(f"Virtual {name} gamepad created")
             except Exception as e:
@@ -1449,29 +1279,36 @@ class NPGLiteSNES:
     def _destroy_gamepad(self):
         """Safely tear down the virtual gamepad and free the ViGEmBus slot."""
         self._gamepad_gen += 1
+        self.engine.take_pad()       # engine stops sending to it before it's released
         if self.gamepad is not None:
-            import gc
             try:
                 self.gamepad.release()
             except Exception as e:
                 print(f"Warning: Virtual gamepad reset failed: {e}")
+            # Dropping the last reference frees the ViGEmBus slot right away
+            # (no gc.collect(): a full collection freezes every thread for ~100 ms)
             try:
                 del self.gamepad
             except Exception as e:
                 print(f"Warning: Virtual gamepad deletion failed: {e}")
             self.gamepad = None
-            gc.collect()
             print("Virtual gamepad released")
 
     def run(self):
         import atexit
         atexit.register(self._destroy_gamepad)
         self.ui.show()
+        # Everything created so far lives for the whole session: move it out of the
+        # garbage collector's scans so automatic collections stay short.
+        import gc
+        gc.collect()
+        gc.freeze()
         try:
             return self.app.exec()
         finally:
             self._destroy_gamepad()
             self.ble.shutdown()
+            self.engine.stop()
 
 
 

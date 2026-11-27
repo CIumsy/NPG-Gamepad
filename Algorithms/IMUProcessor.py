@@ -263,9 +263,9 @@ class IMUProcessor:
         """Forget everything (on disconnect)."""
         self.__init__()
 
-    def start_calibration(self):
+    def start_calibration(self, calibrator=None):
         """Begin a guided calibration. Returns the Calibrator so the UI can follow it."""
-        self.calibrator = Calibrator()
+        self.calibrator = calibrator or Calibrator()
         self._set_stick(0.0, 0.0)
         return self.calibrator
 
