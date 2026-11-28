@@ -73,6 +73,8 @@ class ChannelProcessor:
     # Per-sample processing
 
     def process(self, raw):
+        """Process one raw sample. Returns the filtered signal for display
+        (notch + EMG: HP70 / EEG: LP45 / EOG: BP 1-10 Hz / ECG: ECG band-pass)."""
         v = float(raw)
         if self.notch:
             v = self.notch.process(v)
@@ -80,6 +82,7 @@ class ChannelProcessor:
         if self.filter_type == 'emg':
             f = self.hp70.process(v)
             self.val_emg_envelope = self.emg_env.get_envelope(abs(f))
+            return f
 
         elif self.filter_type == 'eeg':
             lp = self.lp45.process(v)
@@ -89,6 +92,7 @@ class ChannelProcessor:
             self.val_blink_envelope = self.blink_env.get_envelope(abs(hp))
             j = self.jaw_hp70.process(v)
             self.val_jaw_envelope = self.jaw_env.get_envelope(abs(j))
+            return lp
 
         elif self.filter_type == 'eog':
             bp = self.bp1to10.process(v)
@@ -96,7 +100,10 @@ class ChannelProcessor:
             self.val_eye_deviation = bp - self.baseline.get_baseline()
             j = self.jaw_hp70.process(v)
             self.val_jaw_envelope = self.jaw_env.get_envelope(abs(j))
+            return bp
 
         elif self.filter_type == 'ecg':
             f = self.ecg_filter.process(v)
             self.val_ecg = abs(f)
+            return f
+        return v

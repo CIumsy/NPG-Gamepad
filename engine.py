@@ -22,6 +22,7 @@ from Algorithms.BlinkDetector import BlinkDetector
 from Algorithms.JawClenchDetector import JawClenchDetector
 from Algorithms.IMUProcessor import IMUProcessor
 from gamepad import MODE_DS4, DS4_ANALOG_KEYS
+from overlay_shm import FILTER_CODES
 
 STALE_S = 0.050          # packets older than this (time spent inside the app) don't drive outputs
 IDLE_EVAL_S = 0.050      # re-evaluate if no packet for this long (releases timed presses, etc.)
@@ -105,6 +106,7 @@ class SignalEngine:
 
         self._pad = None
         self._pad_lock = threading.Lock()
+        self._ring = None                      # overlay SignalRing while the overlay is on
 
         self._q = queue.SimpleQueue()
         self._thread = None
@@ -207,10 +209,31 @@ class SignalEngine:
 
         limit = min(num_channels, MAX_CHANNELS)
         active = [(ch, self.processors[ch]) for ch in cfg.active_chs if ch < limit]
-        for sample in samples:
-            vals = sample['channels']
+        ring = self._ring
+        if ring is None:
+            for sample in samples:
+                vals = sample['channels']
+                for ch, proc in active:
+                    proc.process(vals[ch])
+        else:
+            # Same processing, plus every filtered sample goes to the overlay
+            block = []
+            for sample in samples:
+                vals = sample['channels']
+                row = [0.0] * MAX_CHANNELS
+                for ch, proc in active:
+                    row[ch] = proc.process(vals[ch])
+                block.append(row)
+            flags = [0] * MAX_CHANNELS
+            codes = [0] * MAX_CHANNELS
             for ch, proc in active:
-                proc.process(vals[ch])
+                flags[ch] = 1
+                codes[ch] = FILTER_CODES.get(proc.filter_type, 0)
+            try:
+                ring.write(block, flags, codes)
+            except Exception as e:
+                print(f"Overlay stream stopped: {e}")
+                self._ring = None
 
         if time.perf_counter() - t_arrival > STALE_S:
             self.stale_skipped += 1          # filters stay continuous, but no output from old data
@@ -234,6 +257,13 @@ class SignalEngine:
                 self.lost_total += lost
                 self.lost_events.append((lost, self.lost_total))
         self._last_counter = samples[-1]['counter']
+
+    def set_overlay_ring(self, ring):
+        """Engine thread (via call): start/stop streaming to the overlay. The old
+        ring is closed here, after the engine has stopped writing to it."""
+        old, self._ring = self._ring, ring
+        if old is not None and old is not ring:
+            old.close()
 
     def reset_stream(self):
         """New connection: forget counters, presses and outputs."""

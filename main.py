@@ -27,6 +27,12 @@ import os
 if hasattr(sys, '_MEIPASS'):
     os.chdir(sys._MEIPASS)
 
+# On-screen overlay process: started by the app as "<app> --overlay <shm name>".
+# Dispatched before the heavy imports below (gamepad driver, BLE) so it stays light.
+if __name__ == "__main__" and len(sys.argv) > 2 and sys.argv[1] == "--overlay":
+    from overlay import main as _overlay_main
+    sys.exit(_overlay_main(sys.argv[2]))
+
 from PySide6.QtWidgets import (
     QApplication, QInputDialog, QMessageBox, QButtonGroup, QDialog,
     QScrollArea, QWidget, QVBoxLayout
@@ -56,10 +62,12 @@ from gamepad import (
 from config import MAX_CHANNELS, FILTER_MAP, DEFAULT_THRESHOLDS
 from ble_manager import BLEManager
 from engine import SignalEngine, EngineConfig, FIXED_ROWS
+from win_perf import disable_power_throttling
 from widgets.ThresholdBar import ThresholdBar
 from widgets.ControllerViewer import ControllerViewer
 from widgets.DualSenseViewer import DualSenseViewer
 from widgets.IMUCalibrationDialog import IMUCalibrationDialog
+from widgets.OverlaySettingsDialog import OverlaySettings, OverlaySettingsDialog
 from Algorithms.IMUProcessor import Calibrator
 
 
@@ -171,6 +179,9 @@ class NPGLiteSNES:
         self._active_chs = []        # ticked channel indices
         self.filter_types = ['emg'] * MAX_CHANNELS   # UI copy; the engine owns the processors
 
+        # Full speed even in the background (a game has focus while you play)
+        disable_power_throttling()
+
         # Signal engine: filtering, detection, IMU and gamepad output on its own thread
         self.engine = SignalEngine()
         self._engine_cfg = None
@@ -185,6 +196,10 @@ class NPGLiteSNES:
 
         # Test Controller Window
         self.test_dialog = None
+
+        # On-screen signal overlay (separate process fed through shared memory)
+        self._overlay_proc = None
+        self._overlay_ring = None
 
         # IMU (MPU6050) motion -> analog stick (processed by the engine)
         self.imu = IMUControl(self.engine)
@@ -216,6 +231,7 @@ class NPGLiteSNES:
         self._emg_combo_rows = []
 
         self._init_imu_row()
+        self._init_overlay_button()
 
         # Hide detection sub-rows initially
         self.ui.grpDoubleBlink.setVisible(False)
@@ -837,6 +853,109 @@ class NPGLiteSNES:
         if self.lbl_imu_status.text() != text:
             self.lbl_imu_status.setText(text)
 
+    # On-screen overlay
+
+    def _init_overlay_button(self):
+        """OVERLAY toggle next to TESTER, same style (no icon)."""
+        from PySide6.QtWidgets import QPushButton
+        tester = self.ui.btnKeybinds
+        btn = QPushButton("OVERLAY")
+        btn.setCheckable(True)
+        btn.setFixedSize(tester.minimumSize())
+        btn.setStyleSheet(tester.styleSheet()
+                          .replace("qproperty-icon: url(icons/gamepad.svg);", "")
+                          .replace("qproperty-iconSize: 18px 18px;", "")
+                          .replace("text-align: left;", "text-align: center;"))
+        btn.setToolTip("Show the filtered signals of the enabled channels on top of every window")
+        layout = self._find_layout_of(tester)
+        layout.insertWidget(layout.indexOf(tester), btn)
+        btn.toggled.connect(self._on_overlay_toggled)
+        self.btn_overlay = btn
+
+        # Settings button right next to it
+        gear = QPushButton("⚙")
+        gear.setFixedSize(tester.minimumSize().height(), tester.minimumSize().height())
+        gear.setStyleSheet(btn.styleSheet().replace("padding: 10px 18px;", "padding: 0px;")
+                           .replace("font-size: 15px;", "font-size: 22px;"))
+        gear.setToolTip("Overlay settings")
+        layout.insertWidget(layout.indexOf(tester), gear)
+        gear.clicked.connect(self._on_overlay_settings)
+        self.btn_overlay_settings = gear
+
+        self.overlay_settings = OverlaySettings.load()
+        self.overlay_settings_dialog = None
+
+    def _on_overlay_settings(self):
+        if not self.overlay_settings_dialog:
+            self.overlay_settings_dialog = OverlaySettingsDialog(
+                self.overlay_settings, self._apply_overlay_settings, self.ui)
+        self.overlay_settings_dialog.show()
+
+    def _apply_overlay_settings(self, settings):
+        """Live update of the running overlay + remember for next launch."""
+        settings.save()
+        if self._overlay_ring is not None:
+            self._overlay_ring.set_settings(settings)
+
+    def _on_overlay_toggled(self, on):
+        if on:
+            self._start_overlay()
+        else:
+            self._stop_overlay()
+
+    def _start_overlay(self):
+        import subprocess
+        from overlay_shm import SignalRing
+        try:
+            ring = SignalRing()
+            ring.heartbeat()
+            ring.set_settings(self.overlay_settings)
+            # The engine gets its own view of the buffer (closed on the engine thread)
+            self.engine.call(self.engine.set_overlay_ring, SignalRing(ring.name))
+            if getattr(sys, 'frozen', False):
+                cmd = [sys.executable, '--overlay', ring.name]
+            else:
+                cmd = [sys.executable, os.path.abspath(__file__), '--overlay', ring.name]
+            self._overlay_proc = subprocess.Popen(cmd)
+            self._overlay_ring = ring
+            self.ui.statusbar.showMessage("Signal overlay on", 3000)
+        except Exception as e:
+            print(f"Overlay failed to start: {e}")
+            self.ui.statusbar.showMessage(f"Overlay failed to start: {e}", 6000)
+            self.engine.call(self.engine.set_overlay_ring, None)
+            self.btn_overlay.blockSignals(True)
+            self.btn_overlay.setChecked(False)
+            self.btn_overlay.blockSignals(False)
+
+    def _stop_overlay(self, wait=False):
+        """Ask the overlay to close, stop the engine writing, release the buffer."""
+        self.engine.call(self.engine.set_overlay_ring, None)
+        ring, self._overlay_ring = self._overlay_ring, None
+        proc, self._overlay_proc = self._overlay_proc, None
+        if ring is not None:
+            ring.request_stop()
+        if proc is not None:
+            if wait:
+                try:
+                    proc.wait(timeout=2)
+                except Exception:
+                    proc.kill()
+            else:
+                QTimer.singleShot(2000, lambda: proc.poll() is None and proc.kill())
+        if ring is not None:
+            ring.close()
+            ring.unlink()
+
+    def _check_overlay(self):
+        """UI tick: keep the overlay alive (heartbeat) and notice if it closed by itself."""
+        if self._overlay_ring is None:
+            return
+        if self._overlay_proc is not None and self._overlay_proc.poll() is not None:
+            print("Overlay closed unexpectedly")
+            self.btn_overlay.setChecked(False)      # -> _stop_overlay
+            return
+        self._overlay_ring.heartbeat()
+
     def _on_keybinds_clicked(self):
         if not self.test_dialog:
             self.test_dialog = ControllerTestDialog(self.ui)
@@ -1213,6 +1332,7 @@ class NPGLiteSNES:
     def _refresh_ui(self):
         """30 Hz UI tick: show the engine's latest values. Never on the signal path."""
         self._push_config()          # safety net: picks up any change not signalled directly
+        self._check_overlay()
         if not self.is_connected:
             return
         eng = self.engine
@@ -1306,6 +1426,7 @@ class NPGLiteSNES:
         try:
             return self.app.exec()
         finally:
+            self._stop_overlay(wait=True)
             self._destroy_gamepad()
             self.ble.shutdown()
             self.engine.stop()
