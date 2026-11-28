@@ -36,8 +36,10 @@ GAP_FRAC = 0.02               # blank gap in front of the pen, fraction of the p
 HEARTBEAT_TIMEOUT_MS = 3000   # app gone -> close
 NO_SIGNAL_S = 1.0
 
-COLORS = {'EMG': QColor('#00ff66'), 'EEG': QColor('#5b9eff'),
-          'EOG': QColor('#ffd55a'), 'ECG': QColor('#ff6b6b')}
+# One colour per channel (CH1..CH6), so every trace is distinct and keeps its
+# colour when other channels are switched on or off
+CHANNEL_COLORS = [QColor('#5b9eff'), QColor('#ffd55a'), QColor('#ff6b6b'),
+                  QColor('#00ff66'), QColor('#c77dff'), QColor('#ff9f43')]
 
 # Fixed half-lane range per signal type at scale 1x (filtered ADC units).
 # The global scale slider multiplies all of them, so every type stays readable.
@@ -298,8 +300,8 @@ class Overlay(QWidget):
         elif show > self._drawn and active and not stalled:
             dirty = self._draw_new(show)                          # only new columns
             for c0, c1 in dirty:
-                x0 = PAD + LABEL_W + int(c0 / dpr) - 1
-                x1 = PAD + LABEL_W + int(np.ceil(c1 / dpr)) + 1
+                x0 = self._plot_x0() + int(c0 / dpr) - 1
+                x1 = self._plot_x0() + int(np.ceil(c1 / dpr)) + 1
                 self.update(QRect(x0, PAD, x1 - x0, self.height() - PAD * 2))
 
     def showEvent(self, e):
@@ -371,7 +373,7 @@ class Overlay(QWidget):
         lo = np.where(valid, lo, 0.0)
         hi = np.where(valid, hi, 0.0)
         cols_img = raster_columns(mid - hi * k, mid - lo * k, lane_px,
-                                  [self._lut(COLORS.get(nm, QColor('#ffffff'))) for nm in self._names],
+                                  [self._lut(CHANNEL_COLORS[ch]) for ch in self._active],
                                   thickness * dpr)
         cols_img[~np.broadcast_to(valid[:, None, :], cols_img.shape)] = 0
 
@@ -388,9 +390,29 @@ class Overlay(QWidget):
 
     # ---- painting ----
 
+    def _labels_right(self):
+        """Titles go on the side facing the middle of the screen: right side for the
+        left corners, left side for the right corners."""
+        return self._frame[3] in (0, 2)
+
+    def _plot_x0(self):
+        return PAD if self._labels_right() else PAD + LABEL_W
+
+    def _titles(self):
+        """Lane titles: EMG numbered in order (EMG1, EMG2, ...); EEG/EOG/ECG once each."""
+        titles, n_emg = [], 0
+        for name in self._names:
+            if name == 'EMG':
+                n_emg += 1
+                titles.append(f"EMG{n_emg}")
+            else:
+                titles.append(name)
+        return titles
+
     def _static_layer(self, w, h, dpr, lane_h, opacity_pct):
         """Background, labels and lane separators: drawn once per layout change."""
-        key = (w, h, dpr, lane_h, opacity_pct, tuple(self._active), tuple(self._names))
+        key = (w, h, dpr, lane_h, opacity_pct, tuple(self._active), tuple(self._names),
+               self._labels_right())
         if key == self._static_key:
             return self._static
         img = QImage(int(round(w * dpr)), int(round(h * dpr)), QImage.Format_ARGB32_Premultiplied)
@@ -398,18 +420,23 @@ class Overlay(QWidget):
         img.fill(Qt.transparent)
         p = QPainter(img)
         p.setRenderHint(QPainter.Antialiasing)
-        p.setPen(QPen(QColor(255, 255, 255, int(40 * max(opacity_pct, 30) / 100)), 1))
-        p.setBrush(QColor(10, 10, 10, int(255 * opacity_pct / 100)))
-        p.drawRoundedRect(QRectF(0.5, 0.5, w - 1, h - 1), 10, 10)
+        # Background, border and lane separators fade with the opacity setting;
+        # at 0% (fully transparent) only the traces and titles are drawn.
+        if opacity_pct > 0:
+            p.setPen(QPen(QColor(255, 255, 255, int(40 * opacity_pct / 100)), 1))
+            p.setBrush(QColor(10, 10, 10, int(255 * opacity_pct / 100)))
+            p.drawRoundedRect(QRectF(0.5, 0.5, w - 1, h - 1), 10, 10)
         p.setFont(self._font)
-        for lane, (ch, name) in enumerate(zip(self._active, self._names)):
+        sep_alpha = int(25 * opacity_pct / 100)
+        plot_x0 = self._plot_x0()
+        label_x = (w - PAD - LABEL_W + 10) if self._labels_right() else PAD + 4
+        for lane, (title, name) in enumerate(zip(self._titles(), self._names)):
             y0 = PAD + lane * lane_h
-            p.setPen(COLORS.get(name, QColor('#ffffff')))
-            p.drawText(QRectF(PAD + 4, y0, LABEL_W - 8, lane_h), Qt.AlignVCenter | Qt.AlignLeft,
-                       f"CH{ch + 1}\n{name}")
-            if lane:
-                p.setPen(QPen(QColor(255, 255, 255, 25), 1))
-                p.drawLine(PAD + LABEL_W, int(y0), w - PAD, int(y0))
+            p.setPen(CHANNEL_COLORS[self._active[lane]])
+            p.drawText(QRectF(label_x, y0, LABEL_W - 8, lane_h), Qt.AlignVCenter | Qt.AlignLeft, title)
+            if lane and sep_alpha:
+                p.setPen(QPen(QColor(255, 255, 255, sep_alpha), 1))
+                p.drawLine(plot_x0, int(y0), plot_x0 + w - PAD * 2 - LABEL_W, int(y0))
         p.end()
         self._static, self._static_key = img, key
         return img
@@ -434,7 +461,7 @@ class Overlay(QWidget):
             p.drawText(QRectF(0, 0, w, h), Qt.AlignCenter,
                        "No signal" if self._active or self._last_count > 0 else "Waiting for signal...")
         elif self._canvas_img is not None:
-            p.drawImage(PAD + LABEL_W, PAD, self._canvas_img)
+            p.drawImage(self._plot_x0(), PAD, self._canvas_img)
         p.end()
 
     def _lut(self, color):
