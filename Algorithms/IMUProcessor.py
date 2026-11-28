@@ -1,7 +1,7 @@
 # IMU (MPU6050) motion -> analog stick.
 #
 # Pipeline per sample (IMU_SAMPLE_RATE, 200 Hz):
-#   raw -> units -> gyro bias removed -> Madgwick AHRS (ahrs library) -> gravity
+#   raw -> units -> gyro bias removed -> Madgwick AHRS -> gravity
 #   direction in the sensor frame -> tilt relative to the calibrated neutral pose
 #   -> piecewise map through the calibrated L/R/U/D poses -> One Euro smoothing
 #   -> radial deadzone -> stick (x, y), each -1..1 (y up = +1).
@@ -15,7 +15,6 @@ import time
 from collections import deque
 
 import numpy as np
-from ahrs.filters import Madgwick
 
 from Algorithms.OneEuroFilter import OneEuroFilter
 from npg_protocol import IMU_SAMPLE_RATE, IMU_ACCEL_LSB_PER_G, IMU_GYRO_LSB_PER_DPS
@@ -50,11 +49,55 @@ def _angle_between(a, b):
     return math.atan2(np.linalg.norm(np.cross(a, b)), float(np.dot(a, b)))
 
 
+def madgwick_imu(q, gx, gy, gz, ax, ay, az, gain, dt):
+    """One Madgwick IMU update (gyro rad/s, accel any unit), plain floats.
+
+    Same equations as ahrs.filters.Madgwick.updateIMU (S. Madgwick, 2010,
+    eqs. 12, 13, 25, 26, 33, 34) without per-sample numpy overhead.
+    q: (w, x, y, z). Returns the new normalised quaternion.
+    """
+    qw, qx, qy, qz = q
+    n = math.sqrt(qw * qw + qx * qx + qy * qy + qz * qz)
+    qw, qx, qy, qz = qw / n, qx / n, qy / n, qz / n
+    if gx == 0.0 and gy == 0.0 and gz == 0.0:
+        return (qw, qx, qy, qz)
+
+    # Rate of change from the gyro: 0.5 * q (x) (0, g)                  (eq. 12)
+    dw = 0.5 * (-qx * gx - qy * gy - qz * gz)
+    dx = 0.5 * (qw * gx + qy * gz - qz * gy)
+    dy = 0.5 * (qw * gy - qx * gz + qz * gx)
+    dz = 0.5 * (qw * gz + qx * gy - qy * gx)
+
+    a_norm = math.sqrt(ax * ax + ay * ay + az * az)
+    if a_norm > 0.0:
+        ax, ay, az = ax / a_norm, ay / a_norm, az / a_norm
+        # Objective function                                               (eq. 25)
+        f0 = 2.0 * (qx * qz - qw * qy) - ax
+        f1 = 2.0 * (qw * qx + qy * qz) - ay
+        f2 = 2.0 * (0.5 - qx * qx - qy * qy) - az
+        if f0 != 0.0 or f1 != 0.0 or f2 != 0.0:
+            # Gradient = J^T f                                             (eqs. 26, 34)
+            s0 = -2.0 * qy * f0 + 2.0 * qx * f1
+            s1 = 2.0 * qz * f0 + 2.0 * qw * f1 - 4.0 * qx * f2
+            s2 = -2.0 * qw * f0 + 2.0 * qz * f1 - 4.0 * qy * f2
+            s3 = 2.0 * qx * f0 + 2.0 * qy * f1
+            sn = math.sqrt(s0 * s0 + s1 * s1 + s2 * s2 + s3 * s3)
+            if sn > 0.0:
+                dw -= gain * s0 / sn                                     # (eq. 33)
+                dx -= gain * s1 / sn
+                dy -= gain * s2 / sn
+                dz -= gain * s3 / sn
+
+    qw, qx, qy, qz = qw + dw * dt, qx + dx * dt, qy + dy * dt, qz + dz * dt   # (eq. 13)
+    n = math.sqrt(qw * qw + qx * qx + qy * qy + qz * qz)
+    return (qw / n, qx / n, qy / n, qz / n)
+
+
 def gravity_from_q(q):
     """Gravity direction in the sensor frame for a Madgwick quaternion (w, x, y, z).
     Matches the normalised accelerometer reading at rest."""
     w, x, y, z = q
-    return np.array([2 * (x * z - w * y), 2 * (w * x + y * z), w * w - x * x - y * y + z * z])
+    return (2 * (x * z - w * y), 2 * (w * x + y * z), w * w - x * x - y * y + z * z)
 
 
 def q_from_accel(acc):
@@ -64,7 +107,7 @@ def q_from_accel(acc):
     pitch = math.atan2(-ax, math.hypot(ay, az))
     cr, sr = math.cos(roll / 2), math.sin(roll / 2)
     cp, sp = math.cos(pitch / 2), math.sin(pitch / 2)
-    return np.array([cr * cp, sr * cp, cr * sp, -sr * sp])
+    return (cr * cp, sr * cp, cr * sp, -sr * sp)
 
 
 class StickCalibration:
@@ -87,9 +130,15 @@ class StickCalibration:
             (na, oa), (nb, ob) = _SECTOR_ORDER[i], _SECTOR_ORDER[(i + 1) % 4]
             m = np.column_stack([self.dirs[na], self.dirs[nb]])
             try:
-                self._sectors.append((np.linalg.inv(m), np.array(oa), np.array(ob)))
+                inv = np.linalg.inv(m)
+                # Stored as plain floats for the per-sample path
+                self._sectors.append((float(inv[0, 0]), float(inv[0, 1]), float(inv[1, 0]), float(inv[1, 1]),
+                                      oa, ob))
             except np.linalg.LinAlgError:
                 self._degenerate = True     # neighbouring poses parallel; problem() reports it
+        self._g0f = tuple(float(v) for v in self.g0)
+        self._e1f = tuple(float(v) for v in self.e1)
+        self._e2f = tuple(float(v) for v in self.e2)
 
     def to_plane(self, g):
         """Tilt from neutral as a 2D vector; length = tilt angle in radians."""
@@ -103,17 +152,33 @@ class StickCalibration:
         return np.array([np.dot(axis, self.e1), np.dot(axis, self.e2)])
 
     def map(self, g):
-        p = self.to_plane(g)
-        out = np.zeros(2)
-        for inv, oa, ob in self._sectors:
-            s, t = inv @ p
-            if s >= -1e-9 and t >= -1e-9:
-                out = s * oa + t * ob
+        """Gravity direction (gx, gy, gz) -> stick (x, y). Plain floats (runs per sample)."""
+        gx, gy, gz = g
+        n = math.sqrt(gx * gx + gy * gy + gz * gz)
+        gx, gy, gz = gx / n, gy / n, gz / n
+        ax, ay, az = self._g0f
+        # Tilt from neutral as a 2D vector (same as to_plane)
+        cx, cy, cz = ay * gz - az * gy, az * gx - ax * gz, ax * gy - ay * gx
+        s = math.sqrt(cx * cx + cy * cy + cz * cz)
+        if s < 1e-9:
+            px = py = 0.0
+        else:
+            k = math.atan2(s, ax * gx + ay * gy + az * gz) / s
+            e1, e2 = self._e1f, self._e2f
+            px = (cx * e1[0] + cy * e1[1] + cz * e1[2]) * k
+            py = (cx * e2[0] + cy * e2[1] + cz * e2[2]) * k
+
+        x = y = 0.0
+        for i00, i01, i10, i11, oa, ob in self._sectors:
+            s_, t_ = i00 * px + i01 * py, i10 * px + i11 * py
+            if s_ >= -1e-9 and t_ >= -1e-9:
+                x = s_ * oa[0] + t_ * ob[0]
+                y = s_ * oa[1] + t_ * ob[1]
                 break
-        r = math.hypot(out[0], out[1])
+        r = math.hypot(x, y)
         if r > 1.0:
-            out /= r
-        return float(out[0]), float(out[1])
+            x, y = x / r, y / r
+        return x, y
 
     def problem(self):
         """Return an error message if the poses can't form a usable map, else None."""
@@ -239,12 +304,12 @@ class Calibrator:
 
 class IMUProcessor:
     def __init__(self):
-        self.gyro_bias = np.zeros(3)      # deg/s
+        self.gyro_bias = (0.0, 0.0, 0.0)  # deg/s
         self.calibration = None           # StickCalibration
         self.calibrator = None            # active Calibrator, or None
         self.stick = (0.0, 0.0)           # latest output, -1..1, y up = +1
         self.last_sample_time = 0.0
-        self._madgwick = Madgwick(frequency=float(IMU_SAMPLE_RATE), gain=MADGWICK_GAIN)
+        self._dt = 1.0 / IMU_SAMPLE_RATE
         self._q = None
         self._fx = OneEuroFilter(IMU_SAMPLE_RATE, EURO_MIN_CUTOFF, EURO_BETA)
         self._fy = OneEuroFilter(IMU_SAMPLE_RATE, EURO_MIN_CUTOFF, EURO_BETA)
@@ -276,29 +341,33 @@ class IMUProcessor:
 
     def process(self, samples):
         """samples: list of raw (counter, ax, ay, az, gx, gy, gz)."""
+        bx, by, bz = self.gyro_bias
         for _, ax, ay, az, gx, gy, gz in samples:
-            acc = np.array([ax, ay, az], dtype=float) / IMU_ACCEL_LSB_PER_G
-            gyr_dps = np.array([gx, gy, gz], dtype=float) / IMU_GYRO_LSB_PER_DPS
-            if not np.any(acc):
+            if ax == 0 and ay == 0 and az == 0:
                 continue
+            ax, ay, az = ax / IMU_ACCEL_LSB_PER_G, ay / IMU_ACCEL_LSB_PER_G, az / IMU_ACCEL_LSB_PER_G
+            gx, gy, gz = gx / IMU_GYRO_LSB_PER_DPS, gy / IMU_GYRO_LSB_PER_DPS, gz / IMU_GYRO_LSB_PER_DPS
 
             if self._q is None:
-                self._q = q_from_accel(acc)
+                self._q = q_from_accel((ax, ay, az))
             else:
-                self._q = self._madgwick.updateIMU(self._q, gyr=(gyr_dps - self.gyro_bias) * DEG, acc=acc)
-            g = gravity_from_q(self._q)
+                self._q = madgwick_imu(self._q, (gx - bx) * DEG, (gy - by) * DEG, (gz - bz) * DEG,
+                                       ax, ay, az, MADGWICK_GAIN, self._dt)
 
             cal = self.calibrator
             if cal is not None:
-                cal.feed(acc, gyr_dps)
+                acc = np.array((ax, ay, az))
+                cal.feed(acc, np.array((gx, gy, gz)))
                 if cal.done:
-                    self.gyro_bias = cal.gyro_bias
+                    self.gyro_bias = tuple(float(v) for v in cal.gyro_bias)
+                    bx, by, bz = self.gyro_bias
                     self.calibration = cal.result
                     self.calibrator = None
                     self._q = q_from_accel(acc)
                     self._fx.reset()
                     self._fy.reset()
                 continue        # no stick output while calibrating
+            g = gravity_from_q(self._q)
 
             if self.calibration is not None:
                 x, y = self.calibration.map(g)

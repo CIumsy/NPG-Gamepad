@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 from importlib.util import find_spec
-from PyInstaller.utils.hooks import collect_data_files
 
 vgamepad_pkg_path = Path(find_spec('vgamepad').submodule_search_locations[0])
 vgamepad_path = vgamepad_pkg_path / 'win' / 'vigem' / 'client'
@@ -35,7 +34,7 @@ a = Analysis(
         ('Controller-Keybinds.ui', '.'),
         ('icons', 'icons'),
         (str(vigem_installer), '.'),
-    ] + collect_data_files('ahrs'),
+    ],
     hiddenimports=['vgamepad', 'bleak', 'PySide6.QtSvg'],
 )
 pyz = PYZ(a.pure)
